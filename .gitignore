@@ -1,0 +1,11 @@
+target
+.classpath
+.project
+.settings
+Thumbs.db
+node_modules
+.DS_Store
+.metadata
+Servers
+.vagrant
+
