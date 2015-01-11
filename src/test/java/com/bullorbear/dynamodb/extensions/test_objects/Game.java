@@ -1,12 +1,15 @@
 package com.bullorbear.dynamodb.extensions.test_objects;
 
+import java.io.Serializable;
 import java.util.Date;
 
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
-@Table("games")
-public class Game {
+@Table("game")
+public class Game implements Serializable {
+
+  private static final long serialVersionUID = -6578894965876600554L;
 
   @HashKey
   private String name;

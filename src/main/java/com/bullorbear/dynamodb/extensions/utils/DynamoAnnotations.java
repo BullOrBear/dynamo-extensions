@@ -5,13 +5,15 @@ import java.lang.reflect.Field;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.bullorbear.dynamodb.extensions.UniqueId;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.AutoGenerateId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.RangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoMappingException;
 import com.google.gson.FieldNamingPolicy;
 
-public class AnnotationUtils {
+public class DynamoAnnotations {
 
   /**
    * Returns the table name for the class given.
@@ -22,9 +24,9 @@ public class AnnotationUtils {
   }
 
   public static Object getHashKeyValue(Object object) {
-    List<Field> hashKeyFields = AnnotationUtils.getAllFieldsAnnotatedWithAnnotation(object.getClass(), HashKey.class);
+    List<Field> hashKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(object.getClass(), HashKey.class);
     if (hashKeyFields.size() == 0 || hashKeyFields.size() > 1) {
-      throw new IllegalStateException("Classes should have only one @HashKey attribute");
+      throw new IllegalStateException("Classes should have only one @HashKey attribute: " + object.getClass().getCanonicalName());
     }
     Field hashKeyField = hashKeyFields.get(0);
     boolean accessible = hashKeyField.isAccessible();
@@ -39,9 +41,9 @@ public class AnnotationUtils {
       hashKeyField.setAccessible(accessible);
     }
   }
-  
+
   public static Object getRangeKeyValue(Object object) {
-    List<Field> rangeKeyFields = AnnotationUtils.getAllFieldsAnnotatedWithAnnotation(object.getClass(), RangeKey.class);
+    List<Field> rangeKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(object.getClass(), RangeKey.class);
     if (rangeKeyFields.size() == 0 || rangeKeyFields.size() > 1) {
       throw new IllegalStateException("Classes should have only one @RangeKey attribute");
     }
@@ -67,7 +69,7 @@ public class AnnotationUtils {
    * @return
    */
   public static String getHashKeyFieldName(Class<?> clazz) {
-    List<Field> hashKeyFields = AnnotationUtils.getAllFieldsAnnotatedWithAnnotation(clazz, HashKey.class);
+    List<Field> hashKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, HashKey.class);
     if (hashKeyFields.size() == 0 || hashKeyFields.size() > 1) {
       throw new IllegalStateException("Classes should have only one @HashKey attribute");
     }
@@ -83,7 +85,7 @@ public class AnnotationUtils {
    * @return
    */
   public static String getRangeKeyFieldName(Class<?> clazz) {
-    List<Field> rangeKeyFields = AnnotationUtils.getAllFieldsAnnotatedWithAnnotation(clazz, RangeKey.class);
+    List<Field> rangeKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, RangeKey.class);
     if (rangeKeyFields.size() == 0 || rangeKeyFields.size() > 1) {
       throw new IllegalStateException("Classes should have only one @RangeKey attribute");
     }
@@ -109,11 +111,43 @@ public class AnnotationUtils {
    * @return
    */
   public static boolean hasRangeKey(Class<?> clazz) {
-    List<Field> rangeKeyFields = AnnotationUtils.getAllFieldsAnnotatedWithAnnotation(clazz, RangeKey.class);
+    List<Field> rangeKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, RangeKey.class);
     if (rangeKeyFields.size() > 1) {
       throw new IllegalStateException("Classes should have only one @RangeKey attribute");
     }
     return rangeKeyFields.size() == 1;
+  }
+
+  /***
+   * Inserts an id into String fields annotated with the {@link AutoGenerateId}
+   * annotation that are null
+   * 
+   * @param object
+   * @return
+   */
+  public static Object autoGenerateIds(Object object) {
+    List<Field> annotatedFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(object.getClass(), AutoGenerateId.class);
+    for (Field field : annotatedFields) {
+      if (String.class.isAssignableFrom(field.getType()) == false) {
+        throw new DynamoMappingException("@AutoGenerateId should only be used on fields with the type String. Class: " + object.getClass() + ". Field: "
+            + field);
+      }
+      boolean accessible = field.isAccessible();
+      field.setAccessible(true);
+      try {
+        Object currentValue = field.get(object);
+        if (currentValue == null) {
+          field.set(object, UniqueId.generateId());
+        }
+      } catch (IllegalArgumentException e) {
+        throw new DynamoMappingException("Unable to auto generate ids for class " + object.getClass().getCanonicalName(), e);
+      } catch (IllegalAccessException e) {
+        throw new DynamoMappingException("Unable to auto generate ids for class " + object.getClass().getCanonicalName(), e);
+      } finally {
+        field.setAccessible(accessible);
+      }
+    }
+    return object;
   }
 
 }

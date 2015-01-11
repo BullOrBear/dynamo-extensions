@@ -1,13 +1,22 @@
 package com.bullorbear.dynamodb.extensions.test_objects;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 
+import com.bullorbear.dynamodb.extensions.mapper.annotations.AutoGenerateId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
-public class Player {
+@Table("player")
+public class Player implements Serializable {
+
+  private static final long serialVersionUID = 2082956582761298174L;
 
   @HashKey
+  @AutoGenerateId
+  private String userId;
+
   private String name;
 
   private Game favouriteGame;
@@ -15,6 +24,14 @@ public class Player {
   private List<Score> scores;
 
   private Set<Game> allGamesPlayed;
+
+  public String getUserId() {
+    return userId;
+  }
+
+  public void setUserId(String userId) {
+    this.userId = userId;
+  }
 
   public String getName() {
     return name;

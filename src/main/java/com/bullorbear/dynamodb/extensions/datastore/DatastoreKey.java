@@ -1,32 +1,35 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.io.Serializable;
+
 import org.apache.http.util.Asserts;
 
 import com.amazonaws.services.dynamodbv2.document.PrimaryKey;
-import com.bullorbear.dynamodb.extensions.utils.AnnotationUtils;
+import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 
-public class DatastoreKey {
+public class DatastoreKey<T extends Serializable> {
 
-  private Class<?> objectClass;
+  private Class<T> objectClass;
   private Object hashKeyValue;
   private Object rangeKeyValue;
 
-  public DatastoreKey(Class<?> objectClass, Object hashKeyValue, Object rangeKeyValue) {
+  public DatastoreKey(Class<T> objectClass, Object hashKeyValue, Object rangeKeyValue) {
     this.objectClass = objectClass;
     this.hashKeyValue = hashKeyValue;
     this.rangeKeyValue = rangeKeyValue;
   }
 
-  public DatastoreKey(Class<?> objectClass, Object hashKeyValue) {
+  public DatastoreKey(Class<T> objectClass, Object hashKeyValue) {
     this.objectClass = objectClass;
     this.hashKeyValue = hashKeyValue;
   }
 
-  public DatastoreKey(Object keyObject) {
-    this.objectClass = keyObject.getClass();
-    this.hashKeyValue = AnnotationUtils.getHashKeyValue(keyObject);
-    if (AnnotationUtils.hasRangeKey(this.objectClass)) {
-      this.rangeKeyValue = AnnotationUtils.getRangeKeyValue(keyObject);
+  @SuppressWarnings("unchecked")
+  public DatastoreKey(T keyObject) {
+    this.objectClass = (Class<T>) keyObject.getClass();
+    this.hashKeyValue = DynamoAnnotations.getHashKeyValue(keyObject);
+    if (DynamoAnnotations.hasRangeKey(this.objectClass)) {
+      this.rangeKeyValue = DynamoAnnotations.getRangeKeyValue(keyObject);
     }
   }
 
@@ -34,7 +37,7 @@ public class DatastoreKey {
     return objectClass;
   }
 
-  public void setObjectClass(Class<?> objectClass) {
+  public void setObjectClass(Class<T> objectClass) {
     this.objectClass = objectClass;
   }
 
@@ -54,33 +57,34 @@ public class DatastoreKey {
     this.rangeKeyValue = rangeKeyValue;
   }
 
-  public DatastoreKey withObjectClass(Class<?> objectClass) {
+  public DatastoreKey<T> withObjectClass(Class<T> objectClass) {
     this.objectClass = objectClass;
     return this;
   }
 
-  public DatastoreKey withHashKeyValue(Object hashKeyValue) {
+  public DatastoreKey<T> withHashKeyValue(Object hashKeyValue) {
     this.hashKeyValue = hashKeyValue;
     return this;
   }
 
-  public DatastoreKey withRangeKeyValue(Object rangeKeyValue) {
+  public DatastoreKey<T> withRangeKeyValue(Object rangeKeyValue) {
     this.rangeKeyValue = rangeKeyValue;
     return this;
   }
 
   public String getTableName() {
     Asserts.notNull(this.objectClass, "Object class has not been set for this datastore key");
-    return AnnotationUtils.getTableName(this.objectClass);
+    return DynamoAnnotations.getTableName(this.objectClass);
   }
 
   public PrimaryKey toPrimaryKey() {
     Asserts.notNull(this.objectClass, "Object class has not been set for this datastore key");
     Asserts.notNull(this.hashKeyValue, "Hash key has not been set for this datastore key");
     if (rangeKeyValue != null) {
-      return new PrimaryKey(AnnotationUtils.getHashKeyFieldName(objectClass), hashKeyValue, AnnotationUtils.getRangeKeyFieldName(objectClass), rangeKeyValue);
+      return new PrimaryKey(DynamoAnnotations.getHashKeyFieldName(objectClass), hashKeyValue, DynamoAnnotations.getRangeKeyFieldName(objectClass),
+          rangeKeyValue);
     }
-    return new PrimaryKey(AnnotationUtils.getHashKeyFieldName(objectClass), hashKeyValue);
+    return new PrimaryKey(DynamoAnnotations.getHashKeyFieldName(objectClass), hashKeyValue);
   }
 
   @Override
@@ -101,7 +105,7 @@ public class DatastoreKey {
       return false;
     if (getClass() != obj.getClass())
       return false;
-    DatastoreKey other = (DatastoreKey) obj;
+    DatastoreKey<?> other = (DatastoreKey<?>) obj;
     if (hashKeyValue == null) {
       if (other.hashKeyValue != null)
         return false;
@@ -118,6 +122,11 @@ public class DatastoreKey {
     } else if (!rangeKeyValue.equals(other.rangeKeyValue))
       return false;
     return true;
+  }
+
+  @Override
+  public String toString() {
+    return "DatastoreKey [objectClass=" + objectClass + ", hashKeyValue=" + hashKeyValue + ", rangeKeyValue=" + rangeKeyValue + "]";
   }
 
 }

@@ -9,7 +9,7 @@ import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.bullorbear.dynamodb.extensions.test_objects.Game;
-import com.bullorbear.dynamodb.extensions.utils.AnnotationUtils;
+import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 
 public class MapperTest extends TestCase {
 
@@ -34,7 +34,7 @@ public class MapperTest extends TestCase {
 
   public void testReadItem() throws Exception {
     DynamoDB dynamo = new DynamoDB(client);
-    Table table = dynamo.getTable(AnnotationUtils.getTableName(Game.class));
+    Table table = dynamo.getTable(DynamoAnnotations.getTableName(Game.class));
     Item gameItem = table.getItem("name", "Hitman");
     Serialiser s = new Serialiser();
     Game g = s.deserialise(gameItem, Game.class);
