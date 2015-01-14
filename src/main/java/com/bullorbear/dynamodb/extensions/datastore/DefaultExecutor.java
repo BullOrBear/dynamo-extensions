@@ -1,5 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.LinkedList;
 import java.util.List;
 
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
@@ -24,10 +25,38 @@ public class DefaultExecutor implements Executor {
     return obj;
   }
 
+  @Override
+  public <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys) {
+    List<T> results = new LinkedList<T>();
+    List<DatastoreKey<T>> keysNotInCache = new LinkedList<DatastoreKey<T>>();
+    for (DatastoreKey<T> key : keys) {
+      T obj = cache.get(key);
+      if (obj == null) {
+        keysNotInCache.add(key);
+      } else {
+        results.add(obj);
+      }
+    }
+    if (keysNotInCache.size() > 0) {
+      List<T> dynamoResults = dynamo.getBatch(keysNotInCache);
+      results.addAll(dynamoResults);
+      cache.setBatch(dynamoResults);
+    }
+    return results;
+  }
+
   public <T extends DatastoreObject> T put(T object) {
     object = dynamo.put(object);
     cache.set(object, false);
     return object;
+  }
+
+  public <T extends DatastoreObject> List<T> put(List<T> objects) {
+    return dynamo.putBatch(objects);
+  }
+
+  public <T extends DatastoreObject> void delete(DatastoreKey<T> key) {
+    dynamo.delete(key);
   }
 
   @Override

@@ -25,6 +25,18 @@ public class DatastoreKey<T extends DatastoreObject> {
   private String rangeKeyColumnName;
   private Object rangeKeyValue;
 
+  public static <T extends DatastoreObject> DatastoreKey<T> key(Class<T> objectClass, Object hashKeyValue, Object rangeKeyValue) {
+    return new DatastoreKey<T>(objectClass, hashKeyValue, rangeKeyValue);
+  }
+
+  public static <T extends DatastoreObject> DatastoreKey<T> key(Class<T> objectClass, Object hashKeyValue) {
+    return new DatastoreKey<T>(objectClass, hashKeyValue);
+  }
+
+  public static <T extends DatastoreObject> DatastoreKey<T> key(T keyObject) {
+    return new DatastoreKey<T>(keyObject);
+  }
+
   public DatastoreKey(Class<T> objectClass, Object hashKeyValue, Object rangeKeyValue) {
     this.setObjectClass(objectClass);
     this.hashKeyValue = hashKeyValue;
@@ -45,7 +57,7 @@ public class DatastoreKey<T extends DatastoreObject> {
     }
   }
 
-  public Class<?> getObjectClass() {
+  public Class<T> getObjectClass() {
     Asserts.notNull(objectClass, "Object class should never be null when you need to call this method.");
     return objectClass;
   }

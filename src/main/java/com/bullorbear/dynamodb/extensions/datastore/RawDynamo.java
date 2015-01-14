@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.AttributeUpdate;
+import com.amazonaws.services.dynamodbv2.document.BatchGetItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.BatchWriteItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Expected;
@@ -28,14 +29,17 @@ import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
 import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
+import com.amazonaws.services.dynamodbv2.document.TableKeysAndAttributes;
 import com.amazonaws.services.dynamodbv2.document.TableWriteItems;
 import com.amazonaws.services.dynamodbv2.document.UpdateItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import com.amazonaws.services.dynamodbv2.model.KeysAndAttributes;
 import com.amazonaws.services.dynamodbv2.model.ReturnValue;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
+import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoReadException;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoWriteException;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.UnableToObtainLockException;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
@@ -233,6 +237,89 @@ public class RawDynamo {
     return true;
   }
 
+  <T extends DatastoreObject> List<T> getBatch(List<DatastoreKey<T>> keys) {
+    List<List<DatastoreKey<T>>> batches = Lists.partition(keys, 100);
+    final CountDownLatch latch = new CountDownLatch(batches.size());
+    final List<Exception> caughtExceptions = Collections.synchronizedList(new LinkedList<Exception>());
+    final List<T> fetchedObjects = Collections.synchronizedList(new LinkedList<T>());
+    for (final List<DatastoreKey<T>> batch : batches) {
+      new Thread(new Runnable() {
+        public void run() {
+          try {
+            fetchedObjects.addAll(getUpTo100Items(batch));
+          } catch (Exception e) {
+            caughtExceptions.add(e);
+          } finally {
+            latch.countDown();
+          }
+        }
+      }).start();
+    }
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+    }
+
+    if (caughtExceptions.size() > 0) {
+      throw new DynamoReadException("Unable to read all items in batch. Caught " + caughtExceptions.size() + " exception(s) \n" + caughtExceptions.toString());
+    }
+
+    return fetchedObjects;
+  }
+
+  private <T extends DatastoreObject> List<T> getUpTo100Items(List<DatastoreKey<T>> keys) {
+    Asserts.check(keys.size() < 101, "More than 100 objects passed to internal batch get function.");
+
+    Map<String, List<DatastoreKey<T>>> keysGroupedByTable = new HashMap<String, List<DatastoreKey<T>>>();
+    Map<String, Class<T>> tableNameToClass = new HashMap<String, Class<T>>();
+    for (DatastoreKey<T> key : keys) {
+      String tableName = key.getTableName();
+      List<DatastoreKey<T>> list = MoreObjects.firstNonNull(keysGroupedByTable.get(tableName), new LinkedList<DatastoreKey<T>>());
+      list.add(key);
+      keysGroupedByTable.put(tableName, list);
+      tableNameToClass.put(tableName, key.getObjectClass());
+    }
+
+    List<TableKeysAndAttributes> readItems = new ArrayList<TableKeysAndAttributes>();
+    for (Entry<String, List<DatastoreKey<T>>> entry : keysGroupedByTable.entrySet()) {
+      TableKeysAndAttributes readItem = new TableKeysAndAttributes(entry.getKey());
+      for (DatastoreKey<T> key : entry.getValue()) {
+        readItem.addPrimaryKey(key.toPrimaryKey());
+      }
+      readItems.add(readItem);
+    }
+
+    Map<String, List<Item>> fetchedItems = new HashMap<String, List<Item>>();
+    BatchGetItemOutcome result = dynamo.batchGetItem(readItems.toArray(new TableKeysAndAttributes[0]));
+    fetchedItems.putAll(result.getTableItems());
+    Map<String, KeysAndAttributes> unprocessed = result.getBatchGetItemResult().getUnprocessedKeys();
+    if (unprocessed.size() > 0 && unprocessed.get(0) != null) {
+      retryUnprocessedReadItems(unprocessed, fetchedItems, 1);
+    }
+
+    List<T> objects = new LinkedList<T>();
+    for (Entry<String, List<Item>> entry : fetchedItems.entrySet()) {
+      for (Item item : entry.getValue()) {
+        objects.add(serialiser.deserialise(item, tableNameToClass.get(entry.getKey())));
+      }
+    }
+    return objects;
+  }
+
+  private <T extends DatastoreObject> void retryUnprocessedReadItems(Map<String, KeysAndAttributes> unprocessedKeys, Map<String, List<Item>> fetchedItems,
+      int attempts) {
+    System.out.println("Retrying unprocessed read items. Attempt " + attempts);
+    sleepExponentially(attempts);
+    BatchGetItemOutcome result = dynamo.batchGetItemUnprocessed(unprocessedKeys);
+    fetchedItems.putAll(result.getTableItems());
+    if (result.getUnprocessedKeys().size() > 0) {
+      if (attempts >= MAX_RETRY_ATTEMPTS) {
+        throw new DynamoWriteException("Unable to put all items in batch. Retry limit reached.");
+      }
+      retryUnprocessedReadItems(result.getUnprocessedKeys(), fetchedItems, attempts++);
+    }
+  }
+
   @SuppressWarnings("unchecked")
   public <T extends DatastoreObject> T put(T object) {
     // Give the object an ID if it hasn't got one
@@ -338,7 +425,7 @@ public class RawDynamo {
       if (attempts >= MAX_RETRY_ATTEMPTS) {
         throw new DynamoWriteException("Unable to put all items in batch. Retry limit reached.");
       }
-      retryUnprocessedItems(unprocessedItems, attempts++);
+      retryUnprocessedItems(result.getUnprocessedItems(), attempts++);
     }
   }
 

@@ -1,7 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.http.util.Asserts;
 
@@ -9,7 +8,6 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.bullorbear.dynamodb.extensions.UniqueId;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
-import com.google.common.base.Stopwatch;
 
 public class Datastore {
 
@@ -31,9 +29,21 @@ public class Datastore {
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     return executor.get(key);
   }
+  
+  public <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys) {
+    return executor.get(keys);
+  }
 
   public <T extends DatastoreObject> T put(T object) {
     return executor.put(object);
+  }
+
+  public <T extends DatastoreObject> List<T> put(List<T> objects) {
+    return executor.put(objects);
+  }
+
+  public <T extends DatastoreObject> void delete(DatastoreKey<T> key) {
+    executor.delete(key);
   }
 
   public <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey) {

@@ -6,9 +6,8 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.Map.Entry;
 
 import org.apache.http.util.Asserts;
 import org.slf4j.Logger;
@@ -19,7 +18,6 @@ import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
-import com.google.common.base.Stopwatch;
 
 public class TransactionalExecutor implements Executor {
 
@@ -85,6 +83,19 @@ public class TransactionalExecutor implements Executor {
     return object;
   }
 
+  @Override
+  public <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys) {
+    if (keys.size() > 5) {
+      logger
+          .warn("Warning batch loading more than 5 items in a transaction can take a long time. Best to batch load once a transaction has finished if you don't need to mutate the objects.");
+    }
+    List<T> results = new LinkedList<T>();
+    for (DatastoreKey<T> key : keys) {
+      results.add(this.get(key));
+    }
+    return results;
+  }
+
   public <T extends DatastoreObject> T put(T object) {
     // Possibilities:
 
@@ -114,6 +125,18 @@ public class TransactionalExecutor implements Executor {
     transaction.incrementSessionObjectCount();
 
     return object;
+  }
+
+  public <T extends DatastoreObject> List<T> put(List<T> objects) {
+    for (T obj : objects) {
+      this.put(obj);
+    }
+    return objects;
+  }
+
+  @Override
+  public <T extends DatastoreObject> void delete(DatastoreKey<T> key) {
+    throw new UnsupportedOperationException("Deletes in transactions are not currently supported");
   }
 
   // Adds all the items we want to write to the transaction item log

@@ -16,7 +16,13 @@ public interface Executor {
 
   <T extends DatastoreObject> T get(DatastoreKey<T> key);
 
+  <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys);
+
   <T extends DatastoreObject> T put(T object);
+
+  <T extends DatastoreObject> List<T> put(List<T> objects);
+
+  <T extends DatastoreObject> void delete(DatastoreKey<T> key);
 
   /***
    * Returns all the objects of class {@code type} that have the {@code hashkey}
