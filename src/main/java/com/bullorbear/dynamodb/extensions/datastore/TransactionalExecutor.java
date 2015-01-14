@@ -9,12 +9,17 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.http.util.Asserts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 
 public class TransactionalExecutor implements Executor {
+
+  private static final Logger logger = LoggerFactory.getLogger(TransactionalExecutor.class);
 
   private RawDynamo dynamo;
   private DatastoreCache cache;
@@ -24,7 +29,7 @@ public class TransactionalExecutor implements Executor {
   private List<Serializable> lockedObjects = new LinkedList<Serializable>();
   private List<TransactionItem> transactionItems;
 
-  public TransactionalExecutor(RawDynamo dynamo, DatastoreCache cache, Serialiser serialiser) {
+  public TransactionalExecutor(AmazonDynamoDBAsyncClient asyncClient, RawDynamo dynamo, DatastoreCache cache, Serialiser serialiser) {
     this.dynamo = dynamo;
     this.cache = cache;
     this.serialiser = serialiser;
@@ -73,6 +78,10 @@ public class TransactionalExecutor implements Executor {
     // Give the object an ID if it hasn't got one
     DynamoAnnotations.autoGenerateIds(object);
     sessionObjects.put(new DatastoreKey<T>(object), object);
+
+    // TODO possible optimisation -> could async put the object into the
+    // transaction item log at this point
+
     return object;
   }
 
@@ -81,6 +90,8 @@ public class TransactionalExecutor implements Executor {
     // check we're in a state where we can commit
     Asserts.check(transaction.getState() == TransactionState.OPEN, "Unable to commit as the transaction (" + transaction.getTransactionId() + ") is not open: "
         + transaction.getState());
+    Asserts.check(transaction.hasTimedOut() == false, "Unable to commit as the transaction has timed out. Transactions need to complete in less than "
+        + Transaction.TRANSACTION_TIMEOUT_MILLISECONDS + " milliseconds.");
 
     // write all the objects we need to update to the transaction log
     transactionItems = new LinkedList<TransactionItem>();
@@ -120,21 +131,7 @@ public class TransactionalExecutor implements Executor {
     transaction.setFlushDate(new Date());
     syncTransaction();
 
-    // Disabling delete whilst in beta testing
-    // new Thread(new Runnable() {
-    // public void run() {
-    // deleteTransaction();
-    // }
-    // }).start();
-  }
-
-  private void deleteTransaction() {
-    Asserts.check(transaction.getState() == TransactionState.FLUSHED, "Unable to delete the transaction (" + transaction.getTransactionId()
-        + ") as it has not been flushed: " + transaction.getState());
-
-    // remove the items successfully written from the transaction log
-
-    // delete transaction
+    clean();
   }
 
   // undoes any locks applied during this transaction and removes all temporary
@@ -147,12 +144,27 @@ public class TransactionalExecutor implements Executor {
     dynamo.putBatch(lockedObjects);
 
     transaction.setState(TransactionState.ROLLED_BACK);
+    transaction.setRollBackDate(new Date());
     syncTransaction();
 
-    // remove any queued tasks
-    // remove the transaction items (there shouldn't be any)
-    // delete the transaction record
-    // ... deleteTransaction();
+    clean();
+  }
+
+  /***
+   * Deletes the transaction and any tx items that were created.
+   * 
+   * Will create a new task to run this in the background
+   */
+  private void clean() {
+    Asserts.check(transaction.getState() == TransactionState.FLUSHED || transaction.getState() == TransactionState.ROLLED_BACK,
+        "Only transactions in the FLUSHED or ROLLED_BACK state can be cleaned");
+    new Thread(new Runnable() {
+      public void run() {
+        dynamo.deleteBatch(transactionItems);
+        dynamo.delete(new DatastoreKey<Transaction>(transaction));
+        logger.info(transaction.outputStats(new Date()));
+      }
+    }).start();
   }
 
 }

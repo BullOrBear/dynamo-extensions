@@ -7,14 +7,16 @@ import org.joda.time.DateTime;
 
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.bullorbear.dynamodb.extensions.datastore.Datastore;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreFactory;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreKey;
+import com.bullorbear.dynamodb.extensions.datastore.RawDynamo;
 import com.bullorbear.dynamodb.extensions.datastore.Transaction;
+import com.bullorbear.dynamodb.extensions.datastore.TransactionRecoverer;
 import com.bullorbear.dynamodb.extensions.datastore.cache.InMemoryCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.test_objects.Game;
@@ -24,18 +26,24 @@ import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 public class DatastoreTests extends TestCase {
 
   private Datastore datastore;
-  private AmazonDynamoDBClient client;
+  private AmazonDynamoDBAsyncClient client;
 
   @Override
   protected void setUp() throws Exception {
     BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAJJUWPEMYXKMG7YOQ", "MtE5953bOEe8pqhfZl8V5x00New6Qt67gS9CluUB");
-    client = new AmazonDynamoDBClient(credentials);
+    client = new AmazonDynamoDBAsyncClient(credentials);
     client.setRegion(Regions.EU_CENTRAL_1);
-    DatastoreFactory.setAmazonDynamoDBClient(client);
+    DatastoreFactory.setAsyncClient(client);
     DatastoreFactory.setSerialiser(new Serialiser());
     DatastoreFactory.setCache(new InMemoryCache());
 
     datastore = DatastoreFactory.getDatastore();
+  }
+
+  public void testRecoverStuckTransaction() throws Exception {
+    RawDynamo dynamo =  new RawDynamo(client, new Serialiser());
+    TransactionRecoverer recoverer = new TransactionRecoverer(client, dynamo, new Serialiser());
+    recoverer.sweep();
   }
 
   public void testSetItem() throws Exception {
@@ -79,12 +87,12 @@ public class DatastoreTests extends TestCase {
     Item item = table.getItem("name", "Minecraft");
 
     // Check the lock is in place
-    assertEquals(txn.getTransactionId(), item.getString(Transaction.TRANSACTION_ID_COLUMN_IDENTIFIER));
+    assertEquals(txn.getTransactionId(), item.getString(Transaction.TRANSACTION_ID_COLUMN_ID));
 
     // Check the lock is removed on commit
     txn.commit();
     item = table.getItem("name", "Minecraft");
-    assertNull(item.get(Transaction.TRANSACTION_ID_COLUMN_IDENTIFIER));
+    assertNull(item.get(Transaction.TRANSACTION_ID_COLUMN_ID));
   }
 
   public void testTransactionalSetItems() throws Exception {

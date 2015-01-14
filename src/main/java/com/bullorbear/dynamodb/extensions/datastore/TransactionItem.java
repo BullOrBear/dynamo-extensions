@@ -20,14 +20,15 @@ public class TransactionItem implements Serializable {
   @RangeKey
   private String itemId;
 
-  private String tableName;
+  private DatastoreKey<?> key;
   private Item item;
+  private boolean written;
 
   public static TransactionItem createPutItem(String transactionId, DatastoreKey<?> key, Item item) {
     TransactionItem txItem = new TransactionItem();
     txItem.setTransactionId(transactionId);
+    txItem.setKey(key);
     txItem.setItem(item);
-    txItem.setTableName(key.getTableName());
 
     String itemId = StringUtils.join(new Object[] { key.getTableName(), key.getHashKeyValue(), key.getRangeKeyValue() }, ';');
     txItem.setItemId(itemId);
@@ -51,12 +52,12 @@ public class TransactionItem implements Serializable {
     this.itemId = itemId;
   }
 
-  public String getTableName() {
-    return tableName;
+  public DatastoreKey<?> getKey() {
+    return key;
   }
 
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
+  public void setKey(DatastoreKey<?> key) {
+    this.key = key;
   }
 
   public Item getItem() {
@@ -67,4 +68,16 @@ public class TransactionItem implements Serializable {
     this.item = item;
   }
 
+  /***
+   * true if the item has been written to its destination table
+   * 
+   * @return
+   */
+  public boolean isWritten() {
+    return written;
+  }
+
+  public void setWritten(boolean written) {
+    this.written = written;
+  }
 }

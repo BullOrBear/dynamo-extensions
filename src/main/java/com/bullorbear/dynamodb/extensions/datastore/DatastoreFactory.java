@@ -1,7 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
-import com.amazonaws.services.dynamodbv2.document.DynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 
@@ -9,7 +8,7 @@ public class DatastoreFactory {
 
   private static final ThreadLocal<Datastore> currentDatastore = new ThreadLocal<Datastore>();
 
-  private static AmazonDynamoDBClient client;
+  private static AmazonDynamoDBAsyncClient asyncClient;
   private static Serialiser serialiser;
   private static DatastoreCache cache;
 
@@ -20,13 +19,13 @@ public class DatastoreFactory {
    */
   public static Datastore getDatastore() {
     if (currentDatastore.get() == null) {
-      currentDatastore.set(new Datastore(new DynamoDB(client), serialiser, cache));
+      currentDatastore.set(new Datastore(asyncClient, serialiser, cache));
     }
     return currentDatastore.get();
   }
 
-  public static void setAmazonDynamoDBClient(AmazonDynamoDBClient client) {
-    DatastoreFactory.client = client;
+  public static void setAsyncClient(AmazonDynamoDBAsyncClient asyncClient) {
+    DatastoreFactory.asyncClient = asyncClient;
   }
 
   public static void setSerialiser(Serialiser serialiser) {
