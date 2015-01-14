@@ -23,8 +23,7 @@ public class TaskQueue {
     Datastore datastore = DatastoreFactory.getDatastore();
     if (datastore.hasOpenTransaction() == false) {
       String id = UniqueId.generateId();
-      backingTaskQueue.pushItem(queueName, taskInfo, triggerDate, id);
-      return id;
+      return backingTaskQueue.pushItem(queueName, taskInfo, triggerDate, id);
     }
     // In a transaction here
     Transaction txn = datastore.getTransaction();

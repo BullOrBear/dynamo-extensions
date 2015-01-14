@@ -1,6 +1,7 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
 import java.io.Serializable;
+import java.util.Iterator;
 
 import org.apache.http.util.Asserts;
 
@@ -32,6 +33,10 @@ public class Datastore {
 
   public <T extends Serializable> T put(T object) {
     return executor.put(object);
+  }
+
+  public <T extends Serializable> Iterator<T> query(Class<T> type, Object hashKey) {
+    return executor.query(type, hashKey);
   }
 
   /***
