@@ -1,7 +1,7 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
-import java.io.Serializable;
-import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.util.Asserts;
 
@@ -9,6 +9,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.bullorbear.dynamodb.extensions.UniqueId;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
+import com.google.common.base.Stopwatch;
 
 public class Datastore {
 
@@ -27,15 +28,15 @@ public class Datastore {
     this.executor = new DefaultExecutor(dynamo, cache);
   }
 
-  public <T extends Serializable> T get(DatastoreKey<T> key) {
+  public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     return executor.get(key);
   }
 
-  public <T extends Serializable> T put(T object) {
+  public <T extends DatastoreObject> T put(T object) {
     return executor.put(object);
   }
 
-  public <T extends Serializable> Iterator<T> query(Class<T> type, Object hashKey) {
+  public <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey) {
     return executor.query(type, hashKey);
   }
 
@@ -50,6 +51,15 @@ public class Datastore {
       this.transaction = new Transaction(UniqueId.generateId(), transactionalExecutor);
       transactionalExecutor.setTransaction(this.transaction);
       this.executor = transactionalExecutor;
+      this.transaction.addHook(new TransactionHook() {
+        public void afterCommit(Transaction transaction) {
+          reset();
+        }
+
+        public void afterRollback(Transaction transaction) {
+          reset();
+        }
+      });
     }
     return this.transaction;
   }
@@ -61,6 +71,11 @@ public class Datastore {
 
   public boolean hasOpenTransaction() {
     return this.transaction != null && this.transaction.getState() == TransactionState.OPEN;
+  }
+
+  private void reset() {
+    this.transaction = null;
+    this.executor = new DefaultExecutor(dynamo, cache);
   }
 
 }

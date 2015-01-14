@@ -1,13 +1,13 @@
 package com.bullorbear.dynamodb.extensions.test_objects;
 
-import java.io.Serializable;
 import java.util.Date;
 
+import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
 @Table("game")
-public class Game implements Serializable {
+public class Game extends DatastoreObject {
 
   private static final long serialVersionUID = -6578894965876600554L;
 
@@ -50,6 +50,11 @@ public class Game implements Serializable {
 
   public void setYearReleased(Date yearReleased) {
     this.yearReleased = yearReleased;
+  }
+
+  @Override
+  public String toString() {
+    return "Game [name=" + name + ", genre=" + genre + ", yearReleased=" + yearReleased + "]";
   }
 
 }

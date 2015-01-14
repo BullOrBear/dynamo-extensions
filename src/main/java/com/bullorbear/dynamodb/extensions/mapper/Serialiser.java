@@ -1,6 +1,5 @@
 package com.bullorbear.dynamodb.extensions.mapper;
 
-import java.io.Serializable;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.LinkedList;
@@ -10,6 +9,7 @@ import org.joda.time.DateTime;
 
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreKey;
+import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.gson.DynamoItemAdapter;
 import com.bullorbear.dynamodb.extensions.gson.ISODateAdapter;
 import com.bullorbear.dynamodb.extensions.gson.ISODateTimeAdapter;
@@ -61,7 +61,7 @@ public class Serialiser {
   }
 
   @SuppressWarnings("unchecked")
-  public <T extends Serializable> T deserialise(Item item, DatastoreKey<T> key) {
+  public <T extends DatastoreObject> T deserialise(Item item, DatastoreKey<T> key) {
     if (item == null) {
       return null;
     }

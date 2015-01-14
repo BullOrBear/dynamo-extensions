@@ -1,15 +1,15 @@
 package com.bullorbear.dynamodb.extensions.test_objects;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 
+import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.AutoGenerateId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
 @Table("player")
-public class Player implements Serializable {
+public class Player extends DatastoreObject {
 
   private static final long serialVersionUID = 2082956582761298174L;
 

@@ -1,21 +1,25 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
-import java.io.Serializable;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.util.Asserts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
+import com.google.common.base.Stopwatch;
 
 public class TransactionalExecutor implements Executor {
 
@@ -25,9 +29,11 @@ public class TransactionalExecutor implements Executor {
   private DatastoreCache cache;
   private Serialiser serialiser;
   private Transaction transaction;
-  private Map<DatastoreKey<?>, Serializable> sessionObjects = new HashMap<DatastoreKey<?>, Serializable>();
-  private List<Serializable> lockedObjects = new LinkedList<Serializable>();
-  private List<TransactionItem> transactionItems;
+  private Map<DatastoreKey<?>, DatastoreObject> sessionObjects = new HashMap<DatastoreKey<?>, DatastoreObject>();
+  private List<DatastoreObject> lockedObjects = new LinkedList<DatastoreObject>();
+  private Set<DatastoreKey<?>> lockedObjectKeys = new HashSet<DatastoreKey<?>>();
+
+  private List<TransactionItem> transactionItems = new LinkedList<TransactionItem>();
 
   public TransactionalExecutor(AmazonDynamoDBAsyncClient asyncClient, RawDynamo dynamo, DatastoreCache cache, Serialiser serialiser) {
     this.dynamo = dynamo;
@@ -54,8 +60,14 @@ public class TransactionalExecutor implements Executor {
     dynamo.put(transaction);
   }
 
+  @Override
+  public <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey) {
+    QuerySpec spec = new QuerySpec().withHashKey(DynamoAnnotations.getHashKeyFieldName(type), hashKey);
+    return dynamo.query(type, spec);
+  }
+
   @SuppressWarnings("unchecked")
-  public <T extends Serializable> T get(DatastoreKey<T> key) {
+  public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     // First try to retrieve from the session
     T object = (T) sessionObjects.get(key);
     if (object == null) {
@@ -63,24 +75,43 @@ public class TransactionalExecutor implements Executor {
       object = dynamo.getAndLock(key, transaction);
       if (object != null) {
         lockedObjects.add(object);
+        lockedObjectKeys.add(new DatastoreKey<DatastoreObject>(object));
         sessionObjects.put(key, object);
+        transaction.incrementLockCount();
+        transaction.incrementSessionObjectCount();
         cache.set(object, false);
       }
     }
     return object;
   }
 
-  public <T extends Serializable> T put(T object) {
-    // N.B. if an object isn't being tracked in the session then it is assumed
-    // to be new. If the user reads objects outside of the get() method from
-    // this class and tries to save them there is a risk of data loss.
+  public <T extends DatastoreObject> T put(T object) {
+    // Possibilities:
 
-    // Give the object an ID if it hasn't got one
+    // Object could be new
+    // -- AutoGenerateIds
+    // -- add to session objects to save
+
+    // Object could exist and be locked in this session
+    // -- add to session objects to save
+
+    // Object could exist and not be in session
+    // -- apply lock to object checking that its modified date isn't after the
+    // transaction start date. This ensures that the object hasn't changed from
+    // when it was last checked out.
+
+    DatastoreKey<T> key = new DatastoreKey<T>(object);
+    if (object.isNew() == false && lockedObjectKeys.contains(key) == false) {
+      // Object exists in dynamo and has not yet been locked to this transaction
+      dynamo.getAndLock(key, transaction, this.transaction.getStartDate());
+      lockedObjects.add(object);
+      lockedObjectKeys.add(new DatastoreKey<DatastoreObject>(object));
+      transaction.incrementLockCount();
+    }
+
     DynamoAnnotations.autoGenerateIds(object);
-    sessionObjects.put(new DatastoreKey<T>(object), object);
-
-    // TODO possible optimisation -> could async put the object into the
-    // transaction item log at this point
+    sessionObjects.put(key, object);
+    transaction.incrementSessionObjectCount();
 
     return object;
   }
@@ -94,8 +125,7 @@ public class TransactionalExecutor implements Executor {
         + Transaction.TRANSACTION_TIMEOUT_MILLISECONDS + " milliseconds.");
 
     // write all the objects we need to update to the transaction log
-    transactionItems = new LinkedList<TransactionItem>();
-    for (Entry<DatastoreKey<?>, Serializable> entry : sessionObjects.entrySet()) {
+    for (Entry<DatastoreKey<?>, DatastoreObject> entry : sessionObjects.entrySet()) {
       transactionItems.add(TransactionItem.createPutItem(transaction.getTransactionId(), entry.getKey(), serialiser.serialise(entry.getValue())));
     }
     dynamo.putBatch(transactionItems);
@@ -122,7 +152,7 @@ public class TransactionalExecutor implements Executor {
         + ") is not committed: " + transaction.getState());
 
     // batch write all the objects being updated to their correct tables
-    List<Serializable> objects = new LinkedList<Serializable>(sessionObjects.values());
+    List<DatastoreObject> objects = new LinkedList<DatastoreObject>(sessionObjects.values());
     dynamo.putBatch(objects);
     cache.setBatch(objects);
 
@@ -158,13 +188,9 @@ public class TransactionalExecutor implements Executor {
   private void clean() {
     Asserts.check(transaction.getState() == TransactionState.FLUSHED || transaction.getState() == TransactionState.ROLLED_BACK,
         "Only transactions in the FLUSHED or ROLLED_BACK state can be cleaned");
-    new Thread(new Runnable() {
-      public void run() {
-        dynamo.deleteBatch(transactionItems);
-        dynamo.delete(new DatastoreKey<Transaction>(transaction));
-        logger.info(transaction.outputStats(new Date()));
-      }
-    }).start();
+    dynamo.deleteBatch(transactionItems);
+    dynamo.delete(new DatastoreKey<Transaction>(transaction));
+    logger.info(transaction.outputStats(new Date()));
   }
 
 }

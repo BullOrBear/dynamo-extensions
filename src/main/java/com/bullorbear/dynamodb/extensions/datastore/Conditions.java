@@ -1,9 +1,11 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 
 import com.amazonaws.services.dynamodbv2.document.Expected;
+import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
 
 public class Conditions {
 
@@ -44,6 +46,11 @@ public class Conditions {
   public static Expected[] isInTransation(String transactionId) {
     Expected isLockedWithTransactionCondition = new Expected(Transaction.TRANSACTION_ID_COLUMN_ID).eq(transactionId);
     return new Expected[] { isLockedWithTransactionCondition };
+  }
+
+  public static Expected[] modifiedDateLessThan(Date modifiedDateLimit) {
+    Expected modifiedDateLessThanCondition = new Expected("modified_date").lt(Iso8601Format.format(modifiedDateLimit));
+    return new Expected[] { modifiedDateLessThanCondition };
   }
 
 }

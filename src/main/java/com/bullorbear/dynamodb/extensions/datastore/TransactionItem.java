@@ -1,7 +1,5 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
-import java.io.Serializable;
-
 import org.apache.commons.lang3.StringUtils;
 
 import com.amazonaws.services.dynamodbv2.document.Item;
@@ -10,7 +8,7 @@ import com.bullorbear.dynamodb.extensions.mapper.annotations.RangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
 @Table("Tx-items")
-public class TransactionItem implements Serializable {
+public class TransactionItem extends DatastoreObject {
 
   private static final long serialVersionUID = 6177511490206674880L;
 
@@ -22,7 +20,7 @@ public class TransactionItem implements Serializable {
 
   private DatastoreKey<?> key;
   private Item item;
-  private boolean written;
+  private boolean writtenDuringRecovery;
 
   public static TransactionItem createPutItem(String transactionId, DatastoreKey<?> key, Item item) {
     TransactionItem txItem = new TransactionItem();
@@ -74,10 +72,17 @@ public class TransactionItem implements Serializable {
    * @return
    */
   public boolean isWritten() {
-    return written;
+    return writtenDuringRecovery;
   }
 
   public void setWritten(boolean written) {
-    this.written = written;
+    this.writtenDuringRecovery = written;
+  }
+
+  public boolean hasTimedOut() {
+    if(this.getCreatedDate() == null){
+      return true;
+    }
+    return Transaction.hasTransactionWithDateTimedOut(this.getCreatedDate().toDate());
   }
 }

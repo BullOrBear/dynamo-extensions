@@ -1,11 +1,11 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.http.util.Asserts;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,15 +25,19 @@ import com.amazonaws.services.dynamodbv2.document.BatchWriteItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Expected;
 import com.amazonaws.services.dynamodbv2.document.Item;
+import com.amazonaws.services.dynamodbv2.document.ItemCollection;
+import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.dynamodbv2.document.TableWriteItems;
 import com.amazonaws.services.dynamodbv2.document.UpdateItemOutcome;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.ReturnValue;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoWriteException;
+import com.bullorbear.dynamodb.extensions.mapper.exceptions.UnableToObtainLockException;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
 import com.google.common.base.MoreObjects;
@@ -78,7 +83,26 @@ public class RawDynamo {
     table.deleteItem(key.toPrimaryKey());
   }
 
-  public <T extends Serializable> T get(DatastoreKey<T> key) {
+  /***
+   * Will return all the items that match the query specified. Best not to use
+   * this if you're expecting a large dataset
+   * 
+   * @param type
+   * @param query
+   * @return
+   */
+  public <T extends DatastoreObject> List<T> query(Class<T> type, QuerySpec query) {
+    Table table = dynamo.getTable(DynamoAnnotations.getTableName(type));
+    ItemCollection<QueryOutcome> result = table.query(query);
+    Iterator<Item> iterator = result.iterator();
+    List<T> returnList = new LinkedList<T>();
+    while (iterator.hasNext()) {
+      returnList.add(serialiser.deserialise(iterator.next(), type));
+    }
+    return returnList;
+  }
+
+  public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     Table table = dynamo.getTable(key.getTableName());
     Item item = table.getItem(key.toPrimaryKey());
     return (T) serialiser.deserialise(item, key);
@@ -90,14 +114,28 @@ public class RawDynamo {
    * @param key
    * @return the locked item
    */
-  public <T extends Serializable> T getAndLock(DatastoreKey<T> key, Transaction transaction) {
+  public <T extends DatastoreObject> T getAndLock(DatastoreKey<T> key, Transaction transaction) {
+    return this.getAndLock(key, transaction, null);
+  }
+
+  /***
+   * Uses a conditional update to lock the item and retrieve its contents.
+   * 
+   * @param key
+   * @param transaction
+   * @param modifiedDateLimit
+   *          if supplied will create a condition that the item's modifiedDate
+   *          is less than the date supplied
+   * @return
+   */
+  public <T extends DatastoreObject> T getAndLock(DatastoreKey<T> key, Transaction transaction, Date modifiedDateLimit) {
     Asserts.notNull(transaction, "Can only lock in an open transaction");
     Asserts.check(transaction.getState() == TransactionState.OPEN, "Can only lock in an open transaction");
-    Item item = this.getAndLock(key, transaction, 0);
+    Item item = this.getAndLock(key, transaction, modifiedDateLimit, 0);
     return serialiser.deserialise(item, key);
   }
 
-  private Item getAndLock(DatastoreKey<?> key, Transaction transaction, int attempt) {
+  private Item getAndLock(DatastoreKey<?> key, Transaction transaction, Date modifiedDateLimit, int attempt) {
     if (attempt >= MAX_RETRY_ATTEMPTS) {
       throw new DynamoWriteException(
           "Unable obtain lock on item, retry limit reached. Possible it's a deadlock, long running transaction or the item may not exist. Key: " + key);
@@ -111,6 +149,9 @@ public class RawDynamo {
     // item exists here
     conditions.addAll(Arrays.asList(Conditions.itemExists(key)));
     conditions.addAll(Arrays.asList(Conditions.isNotInATransaction()));
+    if (modifiedDateLimit != null) {
+      conditions.addAll(Arrays.asList(Conditions.modifiedDateLessThan(modifiedDateLimit)));
+    }
     spec.withExpected(conditions);
 
     AttributeUpdate txIdUpdate = new AttributeUpdate(Transaction.TRANSACTION_ID_COLUMN_ID).put(transaction.getTransactionId());
@@ -125,7 +166,8 @@ public class RawDynamo {
     } catch (ConditionalCheckFailedException e) {
       logger.warn("Conditional check failed during get and lock for key " + key);
       if (attempt == 0) {
-        // either the object didn't exist OR the object is already locked.
+        // either the object didn't exist, didn't pass modified date test OR the
+        // object is already locked.
         // If didn't exist then return null.
 
         // TODO perhaps we can do this in parallel
@@ -134,6 +176,10 @@ public class RawDynamo {
         if (item == null) {
           // There wasn't an item
           return null;
+        }
+        Date modifiedDate = Iso8601Format.parse(item.getString("modified_date"));
+        if (modifiedDate.after(modifiedDateLimit)) {
+          throw new UnableToObtainLockException("The item has been altered since this transaction started. " + key);
         }
         // its already locked with a transaction
         // check if we can unlock.
@@ -144,7 +190,7 @@ public class RawDynamo {
       // Should we check the lock here? See if it can be removed?
       // How do we avoid deadlock?
       attempt++;
-      this.getAndLock(key, transaction, attempt);
+      this.getAndLock(key, transaction, modifiedDateLimit, attempt);
     }
 
     return updateResult.getItem();
@@ -188,7 +234,7 @@ public class RawDynamo {
   }
 
   @SuppressWarnings("unchecked")
-  public <T extends Serializable> T put(T object) {
+  public <T extends DatastoreObject> T put(T object) {
     // Give the object an ID if it hasn't got one
     DynamoAnnotations.autoGenerateIds(object);
 
@@ -196,9 +242,17 @@ public class RawDynamo {
     String tableName = DynamoAnnotations.getTableName(objectClass);
     Table table = this.dynamo.getTable(tableName);
 
+    updateAuditDates(object);
     Item item = serialiser.serialise(object);
 
-    table.putItem(item, Conditions.isNotInATransaction());
+    try {
+      table.putItem(item, Conditions.isNotInATransaction());
+    } catch (ConditionalCheckFailedException e) {
+      // This object has a lock on it. Check to see if it can be removed
+      txRecoverer.recoverItem(new DatastoreKey<DatastoreObject>(object));
+      // try one more time
+      table.putItem(item, Conditions.isNotInATransaction());
+    }
     return object;
   }
 
@@ -213,7 +267,7 @@ public class RawDynamo {
    * @param objects
    * @return
    */
-  <T extends Serializable> List<T> putBatch(List<T> objects) {
+  <T extends DatastoreObject> List<T> putBatch(List<T> objects) {
 
     // Assign IDs if required
     for (T obj : objects) {
@@ -248,7 +302,7 @@ public class RawDynamo {
     return objects;
   }
 
-  private <T extends Serializable> void putUpTo25Items(List<T> objects) {
+  private <T extends DatastoreObject> void putUpTo25Items(List<T> objects) {
     Asserts.check(objects.size() < 26, "More than 25 objects passed to internal batch upload function.");
     Map<String, List<T>> objectsGroupedByTable = new HashMap<String, List<T>>();
     for (T object : objects) {
@@ -262,6 +316,7 @@ public class RawDynamo {
     for (Entry<String, List<T>> entry : objectsGroupedByTable.entrySet()) {
       TableWriteItems writeItem = new TableWriteItems(entry.getKey());
       for (T object : entry.getValue()) {
+        updateAuditDates(object);
         Item item = serialiser.serialise(object);
         writeItem.addItemToPut(item);
       }
@@ -275,7 +330,7 @@ public class RawDynamo {
     }
   }
 
-  private <T extends Serializable> void retryUnprocessedItems(Map<String, List<WriteRequest>> unprocessedItems, int attempts) {
+  private <T extends DatastoreObject> void retryUnprocessedItems(Map<String, List<WriteRequest>> unprocessedItems, int attempts) {
     System.out.println("Retrying unprocessed items. Attempt " + attempts);
     sleepExponentially(attempts);
     BatchWriteItemOutcome result = dynamo.batchWriteItemUnprocessed(unprocessedItems);
@@ -287,7 +342,7 @@ public class RawDynamo {
     }
   }
 
-  <T extends Serializable> void deleteBatch(List<T> objects) {
+  <T extends DatastoreObject> void deleteBatch(List<T> objects) {
     List<List<T>> batches = Lists.partition(objects, 25);
     final CountDownLatch latch = new CountDownLatch(batches.size());
     final List<Exception> caughtExceptions = Collections.synchronizedList(new LinkedList<Exception>());
@@ -315,7 +370,7 @@ public class RawDynamo {
     }
   }
 
-  private <T extends Serializable> void deleteUpTo25Items(List<T> objects) {
+  private <T extends DatastoreObject> void deleteUpTo25Items(List<T> objects) {
     Asserts.check(objects.size() < 26, "More than 25 objects passed to internal batch delete function.");
     Map<String, List<T>> objectsGroupedByTable = new HashMap<String, List<T>>();
     for (T object : objects) {
@@ -329,7 +384,7 @@ public class RawDynamo {
     for (Entry<String, List<T>> entry : objectsGroupedByTable.entrySet()) {
       TableWriteItems writeItem = new TableWriteItems(entry.getKey());
       for (T object : entry.getValue()) {
-        writeItem.addPrimaryKeyToDelete(new DatastoreKey<Serializable>(object).toPrimaryKey());
+        writeItem.addPrimaryKeyToDelete(new DatastoreKey<DatastoreObject>(object).toPrimaryKey());
       }
       writeItems.add(writeItem);
     }
@@ -342,16 +397,24 @@ public class RawDynamo {
   }
 
   private void sleepExponentially(int iteration) {
-    if(iteration == 0) {
+    if (iteration == 0) {
       return;
     }
     try {
-      long mills = RandomUtils.nextLong(50, 150) * (iteration ^ 2);
+      long mills = RandomUtils.nextLong(100, 250) * (iteration ^ 2);
       System.out.println("backing off for " + mills + " mills");
       TimeUnit.MILLISECONDS.sleep(mills);
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
+  }
+
+  private DatastoreObject updateAuditDates(DatastoreObject object) {
+    object.setModifiedDate(new DateTime());
+    if (object.isNew()) {
+      object.setCreatedDate(new DateTime());
+    }
+    return object;
   }
 
 }

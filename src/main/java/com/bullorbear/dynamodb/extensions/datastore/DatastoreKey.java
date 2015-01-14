@@ -1,6 +1,5 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
-import java.io.Serializable;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -13,7 +12,7 @@ import com.bullorbear.dynamodb.extensions.utils.AttributeValues;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 import com.google.common.collect.ImmutableMap;
 
-public class DatastoreKey<T extends Serializable> {
+public class DatastoreKey<T extends DatastoreObject> {
 
   @Transient
   private Class<T> objectClass;

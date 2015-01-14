@@ -1,6 +1,5 @@
 package com.bullorbear.dynamodb.extensions.datastore.cache;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -12,6 +11,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreKey;
+import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 
 public class MemcachedDatastoreCache implements DatastoreCache {
 
@@ -34,17 +34,17 @@ public class MemcachedDatastoreCache implements DatastoreCache {
   }
 
   @SuppressWarnings("unchecked")
-  public <T extends Serializable> T get(DatastoreKey<T> key) {
+  public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     String stringKey = generateCacheKey(key);
     T object = (T) memcached.get(stringKey);
     return object;
   }
 
-  public <T extends Serializable> T set(T object) {
+  public <T extends DatastoreObject> T set(T object) {
     return this.set(object, true);
   }
 
-  public <T extends Serializable> T set(T object, boolean blockTillComplete) {
+  public <T extends DatastoreObject> T set(T object, boolean blockTillComplete) {
     Objects.requireNonNull(object, "Cannot store null value in cache.");
 
     String key = generateCacheKey(new DatastoreKey<T>(object));
@@ -65,13 +65,13 @@ public class MemcachedDatastoreCache implements DatastoreCache {
     return object;
   }
 
-  public <T extends Serializable> void setBatch(List<T> objects) {
-    for (Serializable object : objects) {
+  public <T extends DatastoreObject> void setBatch(List<T> objects) {
+    for (DatastoreObject object : objects) {
       this.set(object, false);
     }
   }
 
-  public <T extends Serializable> void remove(DatastoreKey<T> key, boolean blockTillComplete) {
+  public <T extends DatastoreObject> void remove(DatastoreKey<T> key, boolean blockTillComplete) {
     String stringKey = generateCacheKey(key);
     OperationFuture<Boolean> future = memcached.delete(stringKey);
 

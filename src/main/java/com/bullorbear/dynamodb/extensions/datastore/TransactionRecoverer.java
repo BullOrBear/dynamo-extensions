@@ -61,6 +61,12 @@ public class TransactionRecoverer {
     }
   }
 
+  public void recoverItem(DatastoreKey<?> key) {
+    Table table = dynamoClient.getTable(key.getTableName());
+    Item item = table.getItem(key.toPrimaryKey());
+    recoverItem(key, item);
+  }
+
   public void recoverItem(DatastoreKey<?> key, Item item) {
     final String transactionId = item.getString(Transaction.TRANSACTION_ID_COLUMN_ID);
     String lockDateString = item.getString(Transaction.TRANSACTION_LOCK_DATE_COLUMN_ID);

@@ -2,13 +2,16 @@ package com.bullorbear.dynamodb.extensions.test_objects;
 
 import java.util.Date;
 
+import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexRangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.RangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
 @Table("scores")
-public class Score {
+public class Score extends DatastoreObject {
+
+  private static final long serialVersionUID = -3560313819661029321L;
 
   @HashKey
   private String userId;

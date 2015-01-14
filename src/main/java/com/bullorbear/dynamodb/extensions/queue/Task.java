@@ -1,15 +1,15 @@
 package com.bullorbear.dynamodb.extensions.queue;
 
-import java.io.Serializable;
 import java.util.Date;
 
+import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.AutoGenerateId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.RangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
 @Table("tasks")
-public class Task implements Serializable {
+public class Task extends DatastoreObject {
 
   private static final long serialVersionUID = -2297892467119653350L;
 
