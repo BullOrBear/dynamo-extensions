@@ -3,13 +3,13 @@ package com.bullorbear.dynamodb.extensions.datastore;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.util.Asserts;
 
 import com.amazonaws.services.dynamodbv2.document.PrimaryKey;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Transient;
 import com.bullorbear.dynamodb.extensions.utils.AttributeValues;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 public class DatastoreKey<T extends DatastoreObject> {
@@ -58,7 +58,7 @@ public class DatastoreKey<T extends DatastoreObject> {
   }
 
   public Class<T> getObjectClass() {
-    Asserts.notNull(objectClass, "Object class should never be null when you need to call this method.");
+    Preconditions.checkNotNull(objectClass, "Object class should never be null when you need to call this method.");
     return objectClass;
   }
 
@@ -104,7 +104,7 @@ public class DatastoreKey<T extends DatastoreObject> {
   }
 
   public PrimaryKey toPrimaryKey() {
-    Asserts.notNull(this.hashKeyValue, "Hash key has not been set for this datastore key");
+    Preconditions.checkNotNull(this.hashKeyValue, "Hash key has not been set for this datastore key");
     if (hasRangeKey()) {
       return new PrimaryKey(hashKeyColumnName, hashKeyValue, rangeKeyColumnName, rangeKeyValue);
     }

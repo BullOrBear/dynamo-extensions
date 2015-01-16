@@ -4,11 +4,10 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.http.util.Asserts;
-
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Transient;
+import com.google.common.base.Preconditions;
 
 @Table("Tx-log")
 public class Transaction extends DatastoreObject {
@@ -120,12 +119,12 @@ public class Transaction extends DatastoreObject {
   }
 
   public void commit() {
-    Asserts.notNull(transactionalExecutor, "When resuming a transation you can recover using the TransactionRecoverer class");
+    Preconditions.checkNotNull(transactionalExecutor, "When resuming a transation you can recover using the TransactionRecoverer class");
     transactionalExecutor.commit();
   }
 
   public void rollback() {
-    Asserts.notNull(transactionalExecutor, "When resuming a transation you can recover using the TransactionRecoverer class");
+    Preconditions.checkNotNull(transactionalExecutor, "When resuming a transation you can recover using the TransactionRecoverer class");
     transactionalExecutor.rollback();
   }
 

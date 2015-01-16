@@ -45,6 +45,7 @@ import com.bullorbear.dynamodb.extensions.mapper.exceptions.UnableToObtainLockEx
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class RawDynamo {
@@ -144,8 +145,8 @@ public class RawDynamo {
    * @return
    */
   public <T extends DatastoreObject> T getAndLock(DatastoreKey<T> key, Transaction transaction, Date modifiedDateLimit) {
-    Asserts.notNull(transaction, "Can only lock in an open transaction");
-    Asserts.check(transaction.getState() == TransactionState.OPEN, "Can only lock in an open transaction");
+    Preconditions.checkNotNull(transaction, "Can only lock in an open transaction");
+    Preconditions.checkState(transaction.getState() == TransactionState.OPEN, "Can only lock in an open transaction");
     Item item = this.getAndLock(key, transaction, modifiedDateLimit, 0);
     return serialiser.deserialise(item, key);
   }
@@ -279,7 +280,7 @@ public class RawDynamo {
   }
 
   private <T extends DatastoreObject> List<T> getUpTo100Items(List<DatastoreKey<T>> keys) {
-    Asserts.check(keys.size() < 101, "More than 100 objects passed to internal batch get function.");
+    Preconditions.checkArgument(keys.size() < 101, "More than 100 objects passed to internal batch get function.");
 
     Map<String, List<DatastoreKey<T>>> keysGroupedByTable = new HashMap<String, List<DatastoreKey<T>>>();
     Map<String, Class<T>> tableNameToClass = new HashMap<String, Class<T>>();
@@ -402,7 +403,7 @@ public class RawDynamo {
   }
 
   private <T extends DatastoreObject> void putUpTo25Items(List<T> objects) {
-    Asserts.check(objects.size() < 26, "More than 25 objects passed to internal batch upload function.");
+    Preconditions.checkArgument(objects.size() < 26, "More than 25 objects passed to internal batch upload function.");
     Map<String, List<T>> objectsGroupedByTable = new HashMap<String, List<T>>();
     for (T object : objects) {
       String tableName = DynamoAnnotations.getTableName(object.getClass());
@@ -473,7 +474,7 @@ public class RawDynamo {
   }
 
   private <T extends DatastoreObject> void deleteUpTo25Items(List<T> objects) {
-    Asserts.check(objects.size() < 26, "More than 25 objects passed to internal batch delete function.");
+    Preconditions.checkArgument(objects.size() < 26, "More than 25 objects passed to internal batch delete function.");
     Map<String, List<T>> objectsGroupedByTable = new HashMap<String, List<T>>();
     for (T object : objects) {
       String tableName = DynamoAnnotations.getTableName(object.getClass());

@@ -21,6 +21,7 @@ import com.bullorbear.dynamodb.extensions.queue.BackingTaskQueue;
 import com.bullorbear.dynamodb.extensions.queue.Task;
 import com.bullorbear.dynamodb.extensions.queue.TaskQueueFactory;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
+import com.google.common.base.Preconditions;
 
 public class TransactionalExecutor implements Executor {
 
@@ -161,9 +162,9 @@ public class TransactionalExecutor implements Executor {
   // Adds all the items we want to write to the transaction item log
   public void commit() {
     // check we're in a state where we can commit
-    Asserts.check(transaction.getState() == TransactionState.OPEN, "Unable to commit as the transaction (" + transaction.getTransactionId() + ") is not open: "
+    Preconditions.checkState(transaction.getState() == TransactionState.OPEN, "Unable to commit as the transaction (" + transaction.getTransactionId() + ") is not open: "
         + transaction.getState());
-    Asserts.check(transaction.hasTimedOut() == false, "Unable to commit as the transaction has timed out. Transactions need to complete in less than "
+    Preconditions.checkState(transaction.hasTimedOut() == false, "Unable to commit as the transaction has timed out. Transactions need to complete in less than "
         + Transaction.TRANSACTION_TIMEOUT_MILLISECONDS + " milliseconds.");
 
     // write all the objects we need to update to the transaction log
@@ -190,7 +191,7 @@ public class TransactionalExecutor implements Executor {
    * not use this function if you are trying to recover a failed transaction.
    */
   private void flush() {
-    Asserts.check(transaction.getState() == TransactionState.COMMITTED, "Unable to flush as the transaction (" + transaction.getTransactionId()
+    Preconditions.checkState(transaction.getState() == TransactionState.COMMITTED, "Unable to flush as the transaction (" + transaction.getTransactionId()
         + ") is not committed: " + transaction.getState());
 
     // batch write all the objects being updated to their correct tables
@@ -227,7 +228,7 @@ public class TransactionalExecutor implements Executor {
   // objects
   public void rollback() {
     // Check in a state where we can rollback
-    Asserts.check(transaction.getState() == TransactionState.OPEN, "Unable to rollback as the transaction (" + transaction.getTransactionId()
+    Preconditions.checkState(transaction.getState() == TransactionState.OPEN, "Unable to rollback as the transaction (" + transaction.getTransactionId()
         + ") is not open: " + transaction.getState());
     // update the locked objects to remove the locks
     dynamo.putBatch(lockedObjects);
@@ -245,7 +246,7 @@ public class TransactionalExecutor implements Executor {
    * Will create a new task to run this in the background
    */
   private void clean() {
-    Asserts.check(transaction.getState() == TransactionState.FLUSHED || transaction.getState() == TransactionState.ROLLED_BACK,
+    Preconditions.checkState(transaction.getState() == TransactionState.FLUSHED || transaction.getState() == TransactionState.ROLLED_BACK,
         "Only transactions in the FLUSHED or ROLLED_BACK state can be cleaned");
     dynamo.deleteBatch(transactionItems);
     dynamo.deleteBatch(tasks);

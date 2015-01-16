@@ -2,15 +2,13 @@ package com.bullorbear.dynamodb.extensions.datastore;
 
 import java.util.List;
 
-import org.apache.http.util.Asserts;
-import org.slf4j.LoggerFactory;
-
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.UniqueId;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.queue.Task;
+import com.google.common.base.Preconditions;
 
 public class Datastore {
 
@@ -23,7 +21,7 @@ public class Datastore {
 
   Datastore() {
   }
-  
+
   Datastore(AmazonDynamoDBAsyncClient asyncClient, Serialiser serialiser, DatastoreCache cache) {
     this.asyncClient = asyncClient;
     this.cache = cache;
@@ -94,7 +92,7 @@ public class Datastore {
   }
 
   public Transaction getTransaction() {
-    Asserts.notNull(transaction, "Transaction should never be null when calling here. If unsure call beginTransaction() instead.");
+    Preconditions.checkNotNull(transaction, "Transaction should never be null when calling here. If unsure call beginTransaction() instead.");
     return transaction;
   }
 

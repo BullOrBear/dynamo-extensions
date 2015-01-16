@@ -7,7 +7,6 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.util.Asserts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +28,7 @@ import com.bullorbear.dynamodb.extensions.queue.Task;
 import com.bullorbear.dynamodb.extensions.queue.TaskQueueFactory;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
+import com.google.common.base.Preconditions;
 
 public class TransactionRecoverer {
 
@@ -163,7 +163,7 @@ public class TransactionRecoverer {
    * @param items
    */
   private void rollback(Transaction txn, List<TransactionItem> items) {
-    Asserts.check(txn.getState() == TransactionState.OPEN, "Only transactions in the OPEN state can be rolled back.");
+    Preconditions.checkState(txn.getState() == TransactionState.OPEN, "Only transactions in the OPEN state can be rolled back.");
     for (TransactionItem item : items) {
       dynamo.unlock(item.getKey(), item.getTransactionId());
     }
@@ -183,7 +183,7 @@ public class TransactionRecoverer {
    * @param items
    */
   private void flush(Transaction txn, List<TransactionItem> items) {
-    Asserts.check(txn.getState() == TransactionState.COMMITTED, "Only transactions in the COMMITTED state can be flushed.");
+    Preconditions.checkState(txn.getState() == TransactionState.COMMITTED, "Only transactions in the COMMITTED state can be flushed.");
     for (TransactionItem item : items) {
       if (item.isWritten() == false) {
         flushItem(item);
@@ -230,7 +230,7 @@ public class TransactionRecoverer {
    * @param tasks
    */
   private void flushTasks(Transaction txn, List<Task> tasks) {
-    Asserts.check(txn.getState() == TransactionState.FLUSHED, "Only transactions in the FLUSHED state can have their tasks flushed.");
+    Preconditions.checkState(txn.getState() == TransactionState.FLUSHED, "Only transactions in the FLUSHED state can have their tasks flushed.");
     for (Task task : tasks) {
       if (task.canAttemptToForward() == false) {
         flushQueueTask(task);
@@ -254,7 +254,7 @@ public class TransactionRecoverer {
    * @param tasks
    */
   private void clean(Transaction txn, List<TransactionItem> items, List<Task> tasks) {
-    Asserts.check(txn.getState() == TransactionState.FLUSHED_TASKS || txn.getState() == TransactionState.ROLLED_BACK,
+    Preconditions.checkState(txn.getState() == TransactionState.FLUSHED_TASKS || txn.getState() == TransactionState.ROLLED_BACK,
         "Only transactions in the FLUSHED_TASKS or ROLLED_BACK state can be cleaned");
     dynamo.deleteBatch(items);
     dynamo.deleteBatch(tasks);
