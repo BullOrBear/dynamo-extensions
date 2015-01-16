@@ -15,9 +15,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.http.util.Asserts;
+import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.AttributeUpdate;
@@ -50,7 +49,7 @@ import com.google.common.collect.Lists;
 
 public class RawDynamo {
 
-  static final Logger logger = LoggerFactory.getLogger(RawDynamo.class);
+  static final Logger logger = Logger.getLogger(RawDynamo.class);
 
   private static final int MAX_RETRY_ATTEMPTS = 3;
 

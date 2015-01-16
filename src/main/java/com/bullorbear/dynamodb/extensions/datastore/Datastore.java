@@ -3,6 +3,7 @@ package com.bullorbear.dynamodb.extensions.datastore;
 import java.util.List;
 
 import org.apache.http.util.Asserts;
+import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
