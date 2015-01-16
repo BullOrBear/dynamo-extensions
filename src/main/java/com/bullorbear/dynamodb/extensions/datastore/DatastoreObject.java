@@ -4,15 +4,11 @@ import java.io.Serializable;
 
 import org.joda.time.DateTime;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 public abstract class DatastoreObject implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  @JsonIgnore
   private DateTime createdDate;
-  @JsonIgnore
   private DateTime modifiedDate;
 
   public boolean isNew() {
