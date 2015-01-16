@@ -14,7 +14,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.http.util.Asserts;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
 
@@ -117,7 +116,7 @@ public class RawDynamo {
     }
     return returnList;
   }
-  
+
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     Table table = dynamo.getTable(key.getTableName());
     Item item = table.getItem(key.toPrimaryKey());
@@ -342,11 +341,16 @@ public class RawDynamo {
     Table table = this.dynamo.getTable(tableName);
 
     DateTime previousModifiedDate = MoreObjects.firstNonNull(object.getModifiedDate(), new DateTime());
+    Expected[] expected = Conditions.chain(Conditions.isNotInATransaction(), Conditions.modifiedDateLessThanOrEqualTo(previousModifiedDate.toDate()));
+    if (object.isNew()) {
+      expected = Conditions.chain(Conditions.isNotInATransaction());
+    }
+
     updateAuditDates(object);
     Item item = serialiser.serialise(object);
 
     try {
-      table.putItem(item, Conditions.chain(Conditions.isNotInATransaction(), Conditions.modifiedDateLessThanOrEqualTo(previousModifiedDate.toDate())));
+      table.putItem(item, expected);
     } catch (ConditionalCheckFailedException e) {
       // This object may have a lock on it. Check to see if it can be removed
       txRecoverer.recoverItem(new DatastoreKey<DatastoreObject>(object));
@@ -443,7 +447,7 @@ public class RawDynamo {
   }
 
   <T extends DatastoreObject> void deleteBatch(List<T> objects) {
-    if(objects.size() == 0) {
+    if (objects.size() == 0) {
       return;
     }
     List<List<T>> batches = Lists.partition(objects, 25);

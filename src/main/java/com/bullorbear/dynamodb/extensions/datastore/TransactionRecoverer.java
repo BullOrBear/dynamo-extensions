@@ -242,7 +242,7 @@ public class TransactionRecoverer {
 
   private void flushQueueTask(Task task) {
     task.setForwardAttemptDate(new Date());
-    dynamo.put(task);
+    task = dynamo.put(task);
     TaskQueueFactory.getBackingTaskQueue().pushItem(task.getQueueName(), task.getItem(), task.getTriggerDate(), task.getTaskId());
     task.setForwarded(true);
     dynamo.put(task);
