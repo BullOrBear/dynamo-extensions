@@ -16,6 +16,9 @@ public class TaskQueue {
 
   private BackingTaskQueue backingTaskQueue;
 
+  TaskQueue() {
+  }
+
   TaskQueue(BackingTaskQueue backingTaskQueue) {
     this.backingTaskQueue = backingTaskQueue;
   }

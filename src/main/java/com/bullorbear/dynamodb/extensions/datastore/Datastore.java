@@ -20,6 +20,9 @@ public class Datastore {
   private DatastoreCache cache;
   private Serialiser serialiser;
 
+  Datastore() {
+  }
+  
   Datastore(AmazonDynamoDBAsyncClient asyncClient, Serialiser serialiser, DatastoreCache cache) {
     this.asyncClient = asyncClient;
     this.cache = cache;
