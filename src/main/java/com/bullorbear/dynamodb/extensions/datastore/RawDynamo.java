@@ -25,6 +25,7 @@ import com.amazonaws.services.dynamodbv2.document.BatchGetItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.BatchWriteItemOutcome;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Expected;
+import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
 import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
@@ -95,9 +96,9 @@ public class RawDynamo {
    * @param query
    * @return
    */
-  public <T extends DatastoreObject> List<T> query(Class<T> type, QuerySpec query) {
+  public <T extends DatastoreObject> List<T> query(Class<T> type, QuerySpec spec) {
     Table table = dynamo.getTable(DynamoAnnotations.getTableName(type));
-    ItemCollection<QueryOutcome> result = table.query(query);
+    ItemCollection<QueryOutcome> result = table.query(spec);
     Iterator<Item> iterator = result.iterator();
     List<T> returnList = new LinkedList<T>();
     while (iterator.hasNext()) {
@@ -106,6 +107,17 @@ public class RawDynamo {
     return returnList;
   }
 
+  public <T extends DatastoreObject> List<T> query(Class<T> type, String indexName, QuerySpec spec) {
+    Index index = dynamo.getTable(DynamoAnnotations.getTableName(type)).getIndex(indexName);
+    ItemCollection<QueryOutcome> result = index.query(spec);
+    Iterator<Item> iterator = result.iterator();
+    List<T> returnList = new LinkedList<T>();
+    while (iterator.hasNext()) {
+      returnList.add(serialiser.deserialise(iterator.next(), type));
+    }
+    return returnList;
+  }
+  
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     Table table = dynamo.getTable(key.getTableName());
     Item item = table.getItem(key.toPrimaryKey());
@@ -154,7 +166,7 @@ public class RawDynamo {
     conditions.addAll(Arrays.asList(Conditions.itemExists(key)));
     conditions.addAll(Arrays.asList(Conditions.isNotInATransaction()));
     if (modifiedDateLimit != null) {
-      conditions.addAll(Arrays.asList(Conditions.modifiedDateLessThan(modifiedDateLimit)));
+      conditions.addAll(Arrays.asList(Conditions.modifiedDateLessThanOrEqualTo(modifiedDateLimit)));
     }
     spec.withExpected(conditions);
 
@@ -329,13 +341,14 @@ public class RawDynamo {
     String tableName = DynamoAnnotations.getTableName(objectClass);
     Table table = this.dynamo.getTable(tableName);
 
+    DateTime previousModifiedDate = MoreObjects.firstNonNull(object.getModifiedDate(), new DateTime());
     updateAuditDates(object);
     Item item = serialiser.serialise(object);
 
     try {
-      table.putItem(item, Conditions.isNotInATransaction());
+      table.putItem(item, Conditions.chain(Conditions.isNotInATransaction(), Conditions.modifiedDateLessThanOrEqualTo(previousModifiedDate.toDate())));
     } catch (ConditionalCheckFailedException e) {
-      // This object has a lock on it. Check to see if it can be removed
+      // This object may have a lock on it. Check to see if it can be removed
       txRecoverer.recoverItem(new DatastoreKey<DatastoreObject>(object));
       // try one more time
       table.putItem(item, Conditions.isNotInATransaction());
@@ -430,6 +443,9 @@ public class RawDynamo {
   }
 
   <T extends DatastoreObject> void deleteBatch(List<T> objects) {
+    if(objects.size() == 0) {
+      return;
+    }
     List<List<T>> batches = Lists.partition(objects, 25);
     final CountDownLatch latch = new CountDownLatch(batches.size());
     final List<Exception> caughtExceptions = Collections.synchronizedList(new LinkedList<Exception>());

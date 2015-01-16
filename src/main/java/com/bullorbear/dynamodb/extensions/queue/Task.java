@@ -13,6 +13,8 @@ public class Task extends DatastoreObject {
 
   private static final long serialVersionUID = -2297892467119653350L;
 
+  private static final long TIMEOUT_MILLISECONDS = 2000;
+
   @HashKey
   private String transactionId;
 
@@ -22,17 +24,20 @@ public class Task extends DatastoreObject {
 
   private String queueName;
 
-  private String taskInfo;
+  private String item;
 
   private Date triggerDate;
+
+  private boolean forwarded;
+  private Date forwardAttemptDate;
 
   public Task() {
   }
 
-  public Task(String transactionId, String queueName, String taskInfo, Date triggerDate) {
+  public Task(String transactionId, String queueName, String item, Date triggerDate) {
     this.transactionId = transactionId;
     this.queueName = queueName;
-    this.taskInfo = taskInfo;
+    this.item = item;
     this.triggerDate = triggerDate;
   }
 
@@ -60,12 +65,12 @@ public class Task extends DatastoreObject {
     this.queueName = queueName;
   }
 
-  public String getTaskInfo() {
-    return taskInfo;
+  public String getItem() {
+    return item;
   }
 
-  public void setTaskInfo(String taskInfo) {
-    this.taskInfo = taskInfo;
+  public void setItem(String item) {
+    this.item = item;
   }
 
   public Date getTriggerDate() {
@@ -76,4 +81,44 @@ public class Task extends DatastoreObject {
     this.triggerDate = triggerDate;
   }
 
+  /***
+   * True if the task has been forwarded to its queue for processing
+   * 
+   * @return
+   */
+  public boolean isForwarded() {
+    return forwarded;
+  }
+
+  public void setForwarded(boolean forwarded) {
+    this.forwarded = forwarded;
+  }
+
+  public Date getForwardAttemptDate() {
+    return forwardAttemptDate;
+  }
+
+  public void setForwardAttemptDate(Date forwardAttemptDate) {
+    this.forwardAttemptDate = forwardAttemptDate;
+  }
+
+  /***
+   * Will return true if the task hasn't yet been forwarded to its queue or an
+   * attempt has been made but it has subsequently timed out
+   * 
+   * @return
+   */
+  public boolean canAttemptToForward() {
+    return !isForwarded() || hasAttemptTimedOut();
+  }
+
+  private boolean hasAttemptTimedOut() {
+    if (this.getForwardAttemptDate() == null) {
+      return false;
+    }
+    long now = new Date().getTime();
+    long before = this.getForwardAttemptDate().getTime();
+    long diff = now - before;
+    return diff >= TIMEOUT_MILLISECONDS;
+  }
 }

@@ -6,8 +6,8 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.http.util.Asserts;
 import org.slf4j.Logger;
@@ -17,6 +17,9 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
+import com.bullorbear.dynamodb.extensions.queue.BackingTaskQueue;
+import com.bullorbear.dynamodb.extensions.queue.Task;
+import com.bullorbear.dynamodb.extensions.queue.TaskQueueFactory;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 
 public class TransactionalExecutor implements Executor {
@@ -30,6 +33,7 @@ public class TransactionalExecutor implements Executor {
   private Map<DatastoreKey<?>, DatastoreObject> sessionObjects = new HashMap<DatastoreKey<?>, DatastoreObject>();
   private List<DatastoreObject> lockedObjects = new LinkedList<DatastoreObject>();
   private Set<DatastoreKey<?>> lockedObjectKeys = new HashSet<DatastoreKey<?>>();
+  private List<Task> tasks = new LinkedList<Task>();
 
   private List<TransactionItem> transactionItems = new LinkedList<TransactionItem>();
 
@@ -64,6 +68,16 @@ public class TransactionalExecutor implements Executor {
     return dynamo.query(type, spec);
   }
 
+  @Override
+  public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, QuerySpec spec) {
+    return dynamo.query(type, spec);
+  }
+
+  @Override
+  public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec) {
+    return dynamo.query(type, indexName, spec);
+  }
+
   @SuppressWarnings("unchecked")
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     // First try to retrieve from the session
@@ -87,7 +101,7 @@ public class TransactionalExecutor implements Executor {
   public <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys) {
     if (keys.size() > 5) {
       logger
-          .warn("Warning batch loading more than 5 items in a transaction can take a long time. Best to batch load once a transaction has finished if you don't need to mutate the objects.");
+          .warn("Warning! Batch loading more than 5 items in a transaction can take a long time. Best to batch load once a transaction has finished if you don't need to mutate the objects.");
     }
     List<T> results = new LinkedList<T>();
     for (DatastoreKey<T> key : keys) {
@@ -139,6 +153,11 @@ public class TransactionalExecutor implements Executor {
     throw new UnsupportedOperationException("Deletes in transactions are not currently supported");
   }
 
+  public void queueTask(Task task) {
+    this.put(task);
+    tasks.add(task);
+  }
+
   // Adds all the items we want to write to the transaction item log
   public void commit() {
     // check we're in a state where we can commit
@@ -184,6 +203,23 @@ public class TransactionalExecutor implements Executor {
     transaction.setFlushDate(new Date());
     syncTransaction();
 
+    flushQueue();
+  }
+
+  /****
+   * Dispatch the queue items onto their queues
+   */
+  private void flushQueue() {
+    BackingTaskQueue queue = TaskQueueFactory.getBackingTaskQueue();
+    for (Task task : tasks) {
+      queue.pushItem(task.getQueueName(), task.getItem(), task.getTriggerDate(), task.getTaskId());
+    }
+
+    // update the transaction status to flushed
+    transaction.setState(TransactionState.FLUSHED_TASKS);
+    transaction.setTasksFlushDate(new Date());
+    syncTransaction();
+
     clean();
   }
 
@@ -212,6 +248,7 @@ public class TransactionalExecutor implements Executor {
     Asserts.check(transaction.getState() == TransactionState.FLUSHED || transaction.getState() == TransactionState.ROLLED_BACK,
         "Only transactions in the FLUSHED or ROLLED_BACK state can be cleaned");
     dynamo.deleteBatch(transactionItems);
+    dynamo.deleteBatch(tasks);
     dynamo.delete(new DatastoreKey<Transaction>(transaction));
     logger.info(transaction.outputStats(new Date()));
   }

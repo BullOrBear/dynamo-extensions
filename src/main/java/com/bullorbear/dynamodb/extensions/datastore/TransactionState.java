@@ -2,7 +2,7 @@ package com.bullorbear.dynamodb.extensions.datastore;
 
 public enum TransactionState {
 
-  OPEN(1), COMMITTED(2), ROLLED_BACK(3), FLUSHED(4);
+  OPEN(1), COMMITTED(2), ROLLED_BACK(3), FLUSHED(4), FLUSHED_TASKS(5);
 
   private int value;
 
@@ -24,6 +24,8 @@ public enum TransactionState {
       return ROLLED_BACK;
     case 4:
       return FLUSHED;
+    case 5:
+      return FLUSHED_TASKS;
     default:
       return null;
     }

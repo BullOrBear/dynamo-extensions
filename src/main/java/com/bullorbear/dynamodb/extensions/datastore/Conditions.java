@@ -1,5 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
@@ -48,9 +49,17 @@ public class Conditions {
     return new Expected[] { isLockedWithTransactionCondition };
   }
 
-  public static Expected[] modifiedDateLessThan(Date modifiedDateLimit) {
-    Expected modifiedDateLessThanCondition = new Expected("modified_date").lt(Iso8601Format.format(modifiedDateLimit));
+  public static Expected[] modifiedDateLessThanOrEqualTo(Date modifiedDateLimit) {
+    Expected modifiedDateLessThanCondition = new Expected("modified_date").le(Iso8601Format.format(modifiedDateLimit));
     return new Expected[] { modifiedDateLessThanCondition };
+  }
+  
+  public static Expected[] chain(Expected[]... expectedArrays){
+    List<Expected> conditions = new LinkedList<Expected>();
+    for(Expected[]expected: expectedArrays) {
+      conditions.addAll(Arrays.asList(expected)); 
+    }
+    return conditions.toArray(new Expected[0]);
   }
 
 }

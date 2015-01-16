@@ -17,14 +17,16 @@ import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Expected;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
-import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
 import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.dynamodbv2.document.spec.PutItemSpec;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.spec.ScanSpec;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.ConditionalOperator;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
+import com.bullorbear.dynamodb.extensions.queue.Task;
+import com.bullorbear.dynamodb.extensions.queue.TaskQueueFactory;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
 
@@ -122,23 +124,15 @@ public class TransactionRecoverer {
   public void recover(String transactionId) {
     Transaction txn = dynamo.get(new DatastoreKey<Transaction>(Transaction.class, transactionId));
     List<TransactionItem> items = fetchTransactionItems(transactionId);
+    List<Task> tasks = fetchTasks(transactionId);
     if (txn == null) {
-      if (items.size() == 0) {
-        // Either the transaction never occurred or it has already been dealt
-        // with
-        logger.warn("Unable to recover transaction " + transactionId + ". No record or transaction items found");
-        return;
-      } else {
-        // Transaction deleted but items remain. This shouldn't happen
-        // Best we can do here is to unlock any items if they are still under a
-        // lock from the transaction
-        for (TransactionItem item : items) {
-          // TODO can do this in parallel
-          dynamo.unlock(item.getKey(), item.getTransactionId());
-          dynamo.delete(new DatastoreKey<TransactionItem>(item));
-        }
-        return;
+      for (TransactionItem item : items) {
+        // TODO can do this in parallel
+        dynamo.unlock(item.getKey(), item.getTransactionId());
+        dynamo.delete(new DatastoreKey<TransactionItem>(item));
       }
+      dynamo.deleteBatch(tasks);
+      return;
     }
 
     if (txn.hasTimedOut() == false) {
@@ -147,15 +141,19 @@ public class TransactionRecoverer {
       return;
     }
 
-    // check the state OPEN(1), COMMITTED(2), ROLLED_BACK(3), FLUSHED(4)
+    // check the state OPEN(1), COMMITTED(2), ROLLED_BACK(3), FLUSHED(4),
+    // FLUSHED_TASKS(5)
     logger.warn("Attempting recovery of transaction " + transactionId + ". It's state is " + txn.getState());
     if (txn.getState() == TransactionState.OPEN) {
       rollback(txn, items);
     } else if (txn.getState() == TransactionState.COMMITTED) {
       flush(txn, items);
+      flushTasks(txn, tasks);
+    } else if (txn.getState() == TransactionState.FLUSHED) {
+      flushTasks(txn, tasks);
     }
 
-    clean(txn, items);
+    clean(txn, items, tasks);
   }
 
   /****
@@ -223,30 +221,52 @@ public class TransactionRecoverer {
   }
 
   /***
-   * Removes the transaction and any transaction items
+   * Flushes one task to its queue.
+   * 
+   * Each write is conditional ensuring that the item is still locked with the
+   * transaction id if it existed.
+   * 
+   * @param txn
+   * @param tasks
    */
-  private void clean(Transaction txn, List<TransactionItem> items) {
-    Asserts.check(txn.getState() == TransactionState.FLUSHED || txn.getState() == TransactionState.ROLLED_BACK,
-        "Only transactions in the FLUSHED or ROLLED_BACK state can be cleaned");
+  private void flushTasks(Transaction txn, List<Task> tasks) {
+    Asserts.check(txn.getState() == TransactionState.FLUSHED, "Only transactions in the FLUSHED state can have their tasks flushed.");
+    for (Task task : tasks) {
+      if (task.canAttemptToForward() == false) {
+        flushQueueTask(task);
+      }
+    }
+    txn.setState(TransactionState.FLUSHED_TASKS);
+    dynamo.put(txn);
+  }
+
+  private void flushQueueTask(Task task) {
+    task.setForwardAttemptDate(new Date());
+    dynamo.put(task);
+    TaskQueueFactory.getBackingTaskQueue().pushItem(task.getQueueName(), task.getItem(), task.getTriggerDate(), task.getTaskId());
+    task.setForwarded(true);
+    dynamo.put(task);
+  }
+
+  /***
+   * Removes the transaction and any transaction items
+   * 
+   * @param tasks
+   */
+  private void clean(Transaction txn, List<TransactionItem> items, List<Task> tasks) {
+    Asserts.check(txn.getState() == TransactionState.FLUSHED_TASKS || txn.getState() == TransactionState.ROLLED_BACK,
+        "Only transactions in the FLUSHED_TASKS or ROLLED_BACK state can be cleaned");
     dynamo.deleteBatch(items);
+    dynamo.deleteBatch(tasks);
     dynamo.delete(new DatastoreKey<Transaction>(txn));
   }
 
   private List<TransactionItem> fetchTransactionItems(String transactionId) {
-    // Amazon's own client is a little nicer for querying
-    DynamoDB amzDynamo = new DynamoDB(client);
-    Table table = amzDynamo.getTable(DynamoAnnotations.getTableName(TransactionItem.class));
-    ItemCollection<QueryOutcome> result = table.query(DynamoAnnotations.getHashKeyFieldName(TransactionItem.class), transactionId);
-    Iterator<Item> itemIterator = result.iterator();
-    List<TransactionItem> transactionItems = new LinkedList<TransactionItem>();
-    while (itemIterator.hasNext()) {
-      Item item = itemIterator.next();
-      TransactionItem txItem = serialiser.deserialise(item, TransactionItem.class);
-      transactionItems.add(txItem);
-    }
-    // TODO possible improvement for working with bigger items if we just
-    // returned the iterator here
-    return transactionItems;
+    return dynamo.query(TransactionItem.class, new QuerySpec().withHashKey(DynamoAnnotations.getHashKeyFieldName(Task.class), transactionId));
+  }
+
+  private List<Task> fetchTasks(String transactionId) {
+    return dynamo.query(Task.class, new QuerySpec().withHashKey(DynamoAnnotations.getHashKeyFieldName(Task.class), transactionId));
   }
 
   private Iterator<Item> fetchTransactions() {

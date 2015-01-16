@@ -5,9 +5,11 @@ import java.util.List;
 import org.apache.http.util.Asserts;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.UniqueId;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
+import com.bullorbear.dynamodb.extensions.queue.Task;
 
 public class Datastore {
 
@@ -29,12 +31,17 @@ public class Datastore {
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     return executor.get(key);
   }
-  
+
   public <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys) {
     return executor.get(keys);
   }
 
   public <T extends DatastoreObject> T put(T object) {
+    if (object != null && Task.class.isAssignableFrom(object.getClass())) {
+      // Intercept tasks here
+      ((TransactionalExecutor) executor).queueTask((Task) object);
+      return object;
+    }
     return executor.put(object);
   }
 
@@ -48,6 +55,14 @@ public class Datastore {
 
   public <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey) {
     return executor.query(type, hashKey);
+  }
+
+  public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, QuerySpec spec) {
+    return executor.queryWithSpec(type, spec);
+  }
+
+  public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec) {
+    return executor.queryWithSpec(type, indexName, spec);
   }
 
   /***

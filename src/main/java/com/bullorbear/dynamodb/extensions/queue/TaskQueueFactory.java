@@ -17,7 +17,7 @@ public class TaskQueueFactory {
     }
     return currentTaskQueue.get();
   }
-
+ 
   /***
    * This is the queue that tasks get forwarded too once a transaction completes
    */
@@ -25,4 +25,8 @@ public class TaskQueueFactory {
     TaskQueueFactory.backingTaskQueue = backingTaskQueue;
   }
 
+  public static BackingTaskQueue getBackingTaskQueue() {
+    return backingTaskQueue;
+  }
+  
 }

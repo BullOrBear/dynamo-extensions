@@ -52,7 +52,13 @@ public class DefaultExecutor implements Executor {
   }
 
   public <T extends DatastoreObject> List<T> put(List<T> objects) {
-    return dynamo.putBatch(objects);
+    // Note we can't use the putBatch() here as it wont do the conditional
+    // checks could be better with threads though
+    List<T> putObjects = new LinkedList<T>();
+    for (T object : objects) {
+      putObjects.add(this.put(object));
+    }
+    return putObjects;
   }
 
   public <T extends DatastoreObject> void delete(DatastoreKey<T> key) {
@@ -63,5 +69,15 @@ public class DefaultExecutor implements Executor {
   public <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey) {
     QuerySpec spec = new QuerySpec().withHashKey(DynamoAnnotations.getHashKeyFieldName(type), hashKey);
     return dynamo.query(type, spec);
+  }
+
+  @Override
+  public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, QuerySpec spec) {
+    return dynamo.query(type, spec);
+  }
+
+  @Override
+  public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec) {
+    return dynamo.query(type, indexName, spec);
   }
 }

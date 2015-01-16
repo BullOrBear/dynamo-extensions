@@ -2,6 +2,8 @@ package com.bullorbear.dynamodb.extensions.datastore;
 
 import java.util.List;
 
+import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
+
 /***
  * Executors are a layer between the datastore and raw dynamo instance. They
  * intercept data calls, adding some intelliegence over when calls to dynamo are
@@ -33,5 +35,26 @@ public interface Executor {
    * @return
    */
   <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey);
+
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec.
+   * Best not to use with large datasets.
+   * 
+   * @param type
+   * @param spec
+   * @return
+   */
+  <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, QuerySpec spec);
+
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec
+   * using a specific index. Best not to use with large datasets.
+   * 
+   * @param type
+   * @param indexName
+   * @param spec
+   * @return
+   */
+  <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec);
 
 }

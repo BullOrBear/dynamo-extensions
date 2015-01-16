@@ -25,6 +25,7 @@ public class Transaction extends DatastoreObject {
   private Date startDate;
   private Date commitDate;
   private Date flushDate;
+  private Date tasksFlushDate;
   private Date rollBackDate;
   private TransactionState state;
 
@@ -67,6 +68,10 @@ public class Transaction extends DatastoreObject {
     return flushDate;
   }
 
+  public Date getTasksFlushDate() {
+    return tasksFlushDate;
+  }
+
   public Date getRollBackDate() {
     return rollBackDate;
   }
@@ -100,6 +105,10 @@ public class Transaction extends DatastoreObject {
 
   void setFlushDate(Date flushDate) {
     this.flushDate = flushDate;
+  }
+
+  public void setTasksFlushDate(Date tasksFlushDate) {
+    this.tasksFlushDate = tasksFlushDate;
   }
 
   public void setRollBackDate(Date rollBackDate) {

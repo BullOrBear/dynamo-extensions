@@ -17,6 +17,6 @@ public interface BackingTaskQueue {
    * @param uniqueIdentifier
    *          this must be unique across the queue
    */
-  public String pushItem(String queueName, String taskInfo, Date triggerDate, String uniqueIdentifiers);
+  public String pushItem(String queueName, String taskInfo, Date triggerDate, String uniqueIdentifier);
 
 }
