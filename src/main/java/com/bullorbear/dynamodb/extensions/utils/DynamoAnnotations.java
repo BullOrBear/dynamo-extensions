@@ -2,15 +2,32 @@ package com.bullorbear.dynamodb.extensions.utils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
+import org.joda.time.DateTime;
+
+import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
+import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndex;
+import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
+import com.amazonaws.services.dynamodbv2.model.LocalSecondaryIndex;
+import com.amazonaws.services.dynamodbv2.model.Projection;
+import com.amazonaws.services.dynamodbv2.model.ProjectionType;
+import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
+import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
 import com.bullorbear.dynamodb.extensions.UniqueId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.AutoGenerateId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexHashKey;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexRangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.RangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoMappingException;
+import com.google.common.base.MoreObjects;
 import com.google.gson.FieldNamingPolicy;
 
 public class DynamoAnnotations {
@@ -62,6 +79,17 @@ public class DynamoAnnotations {
   }
 
   /***
+   * Returns the field name as it would be translated for Dynamo (i.e. with
+   * underscores instead of camel case)
+   * 
+   * @param clazz
+   * @return
+   */
+  public static String getFieldName(Field field) {
+    return FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES.translateName(field);
+  }
+
+  /***
    * Returns the hash key field name as it would be translated for Dynamo (i.e.
    * with underscores instead of camel case)
    * 
@@ -69,12 +97,8 @@ public class DynamoAnnotations {
    * @return
    */
   public static String getHashKeyFieldName(Class<?> clazz) {
-    List<Field> hashKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, HashKey.class);
-    if (hashKeyFields.size() == 0 || hashKeyFields.size() > 1) {
-      throw new IllegalStateException("Classes should have only one @HashKey attribute");
-    }
-    Field hashKeyField = hashKeyFields.get(0);
-    return FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES.translateName(hashKeyField);
+    Field hashKeyField = DynamoAnnotations.getOnlyFieldAnnotatedWithAnnotation(clazz, HashKey.class);
+    return DynamoAnnotations.getFieldName(hashKeyField);
   }
 
   /***
@@ -85,12 +109,16 @@ public class DynamoAnnotations {
    * @return
    */
   public static String getRangeKeyFieldName(Class<?> clazz) {
-    List<Field> rangeKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, RangeKey.class);
-    if (rangeKeyFields.size() == 0 || rangeKeyFields.size() > 1) {
-      throw new IllegalStateException("Classes should have only one @RangeKey attribute");
+    Field rangeKeyField = DynamoAnnotations.getOnlyFieldAnnotatedWithAnnotation(clazz, RangeKey.class);
+    return DynamoAnnotations.getFieldName(rangeKeyField);
+  }
+
+  public static Field getOnlyFieldAnnotatedWithAnnotation(Class<?> clazz, Class<? extends Annotation> annotation) {
+    List<Field> annotatedFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, annotation);
+    if (annotatedFields.size() == 0 || annotatedFields.size() > 1) {
+      throw new IllegalStateException("Classes should have only one " + annotation + " annotation");
     }
-    Field rangeKeyField = rangeKeyFields.get(0);
-    return FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES.translateName(rangeKeyField);
+    return annotatedFields.get(0);
   }
 
   public static List<Field> getAllFieldsAnnotatedWithAnnotation(Class<?> clazz, Class<? extends Annotation> annotation) {
@@ -150,4 +178,95 @@ public class DynamoAnnotations {
     return object;
   }
 
+  public static DynamoTable createTableRepresentation(Class<?> clazz) {
+    long defaultReadProvisionedThroughput = 5l;
+    long defaultWriteProvisionedThroughput = 5l;
+
+    DynamoTable table = new DynamoTable();
+    table.setTableName(DynamoAnnotations.getTableName(clazz));
+
+    // Get hash key
+    Field hashKeyField = DynamoAnnotations.getOnlyFieldAnnotatedWithAnnotation(clazz, HashKey.class);
+    table.addAttributeDefinition(DynamoAnnotations.toAttributeDefinition(hashKeyField));
+    table.addKeySchema(new KeySchemaElement(DynamoAnnotations.getFieldName(hashKeyField), KeyType.HASH));
+
+    // Get range key
+    if (DynamoAnnotations.hasRangeKey(clazz)) {
+      Field rangeKeyField = DynamoAnnotations.getOnlyFieldAnnotatedWithAnnotation(clazz, RangeKey.class);
+      table.addAttributeDefinition(DynamoAnnotations.toAttributeDefinition(rangeKeyField));
+      table.addKeySchema(new KeySchemaElement(DynamoAnnotations.getFieldName(rangeKeyField), KeyType.RANGE));
+    }
+
+    List<Field> indexHashKeys = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, IndexHashKey.class);
+    List<Field> indexRangeKeys = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, IndexRangeKey.class);
+    Map<String, Field> gsiNameToRangeKeyFieldMap = new HashMap<String, Field>();
+
+    // Get Local index range keys + index name. Also make a note of any range
+    // keys that are in GSI's
+    for (Field indexRangeKeyField : indexRangeKeys) {
+      table.addAttributeDefinition(toAttributeDefinition(indexRangeKeyField));
+
+      IndexRangeKey idxRangeKey = indexRangeKeyField.getAnnotation(IndexRangeKey.class);
+      String[] localSecondaryIndexNames = MoreObjects.firstNonNull(idxRangeKey.localSecondaryIndexNames(), new String[0]);
+      for (String localSecondaryIndexName : localSecondaryIndexNames) {
+        LocalSecondaryIndex lsi = new LocalSecondaryIndex().withIndexName(localSecondaryIndexName);
+        lsi.withKeySchema(new KeySchemaElement(DynamoAnnotations.getFieldName(hashKeyField), KeyType.HASH),
+            new KeySchemaElement(DynamoAnnotations.getFieldName(indexRangeKeyField), KeyType.RANGE));
+        lsi.setProjection(new Projection().withProjectionType(ProjectionType.ALL));
+        table.addLocalSecondaryIndex(lsi);
+      }
+
+      String[] globalSecondaryIndexNames = MoreObjects.firstNonNull(idxRangeKey.globalSecondaryIndexNames(), new String[0]);
+      for (String globalSecondaryIndexName : globalSecondaryIndexNames) {
+        gsiNameToRangeKeyFieldMap.put(globalSecondaryIndexName, indexRangeKeyField);
+      }
+    }
+
+    // Get global index hash + range combos + index name
+    for (Field gsiHashKeyField : indexHashKeys) {
+      table.addAttributeDefinition(toAttributeDefinition(gsiHashKeyField));
+
+      IndexHashKey idxHashKey = gsiHashKeyField.getAnnotation(IndexHashKey.class);
+      String[] globalSecondaryIndexNames = MoreObjects.firstNonNull(idxHashKey.globalSecondaryIndexNames(), new String[0]);
+      for (String globalSecondaryIndexName : globalSecondaryIndexNames) {
+        GlobalSecondaryIndex gsi = new GlobalSecondaryIndex().withIndexName(globalSecondaryIndexName);
+        List<KeySchemaElement> keySchema = new LinkedList<KeySchemaElement>();
+        keySchema.add(new KeySchemaElement(DynamoAnnotations.getFieldName(gsiHashKeyField), KeyType.HASH));
+
+        // Look if this gsi has a range key
+        if (gsiNameToRangeKeyFieldMap.containsKey(globalSecondaryIndexName)) {
+          Field gsiRangeKeyField = gsiNameToRangeKeyFieldMap.get(globalSecondaryIndexName);
+          keySchema.add(new KeySchemaElement(DynamoAnnotations.getFieldName(gsiRangeKeyField), KeyType.RANGE));
+        }
+        gsi.withProjection(new Projection().withProjectionType(ProjectionType.ALL));
+        gsi.withProvisionedThroughput(new ProvisionedThroughput(defaultReadProvisionedThroughput, defaultWriteProvisionedThroughput));
+        table.addGlobalSecondaryIndex(gsi);
+      }
+    }
+
+    table.withProvisionedThroughput(new ProvisionedThroughput(defaultReadProvisionedThroughput, defaultWriteProvisionedThroughput));
+    return table;
+  }
+
+  public static AttributeDefinition toAttributeDefinition(Field field) {
+    AttributeDefinition definition = new AttributeDefinition();
+    definition.setAttributeName(DynamoAnnotations.getFieldName(field));
+    definition.setAttributeType(DynamoAnnotations.toScalarType(field.getType()));
+    return definition;
+  }
+
+  public static ScalarAttributeType toScalarType(Class<?> type) {
+    if (String.class.isAssignableFrom(type))
+      return ScalarAttributeType.S;
+    if (Date.class.isAssignableFrom(type))
+      return ScalarAttributeType.S;
+    if (DateTime.class.isAssignableFrom(type))
+      return ScalarAttributeType.S;
+    if (Number.class.isAssignableFrom(type))
+      return ScalarAttributeType.N;
+    if (Boolean.class.isAssignableFrom(type))
+      return ScalarAttributeType.S;
+
+    throw new UnsupportedOperationException(type + " is not currently supported for turning into a ScalarAttributeType");
+  }
 }

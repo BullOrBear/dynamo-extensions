@@ -70,6 +70,7 @@ public class TransactionRecoverer {
   }
 
   public void recoverItem(DatastoreKey<?> key, Item item) {
+    Preconditions.checkNotNull(item, "Cannot recover a null item");
     final String transactionId = item.getString(Transaction.TRANSACTION_ID_COLUMN_ID);
     String lockDateString = item.getString(Transaction.TRANSACTION_LOCK_DATE_COLUMN_ID);
     if (StringUtils.isBlank(transactionId)) {

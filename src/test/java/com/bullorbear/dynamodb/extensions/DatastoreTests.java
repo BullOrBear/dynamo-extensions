@@ -1,6 +1,9 @@
 package com.bullorbear.dynamodb.extensions;
 
 import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
 import junit.framework.TestCase;
 
@@ -12,21 +15,27 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
+import com.amazonaws.services.dynamodbv2.document.ItemCollection;
+import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
+import com.amazonaws.services.dynamodbv2.document.spec.ScanSpec;
 import com.bullorbear.dynamodb.extensions.datastore.Datastore;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreFactory;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreKey;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.datastore.RawDynamo;
 import com.bullorbear.dynamodb.extensions.datastore.Transaction;
+import com.bullorbear.dynamodb.extensions.datastore.TransactionItem;
 import com.bullorbear.dynamodb.extensions.datastore.TransactionRecoverer;
 import com.bullorbear.dynamodb.extensions.datastore.cache.InMemoryCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.UnableToObtainLockException;
 import com.bullorbear.dynamodb.extensions.test_objects.Game;
 import com.bullorbear.dynamodb.extensions.test_objects.Player;
+import com.bullorbear.dynamodb.extensions.test_objects.Score;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
+import com.google.common.collect.Iterators;
 
 public class DatastoreTests extends TestCase {
 
@@ -43,6 +52,42 @@ public class DatastoreTests extends TestCase {
     DatastoreFactory.setCache(new InMemoryCache());
 
     datastore = DatastoreFactory.getDatastore();
+
+    cleanTable(Transaction.class);
+    cleanTable(TransactionItem.class);
+    cleanTable(Game.class);
+    cleanTable(Score.class);
+    cleanTable(Player.class);
+  }
+
+  private <T extends DatastoreObject> void cleanTable(Class<T> clazz) {
+    DynamoDB dynamo = new DynamoDB(client);
+    Table table = dynamo.getTable(DynamoAnnotations.getTableName(clazz));
+    ItemCollection<ScanOutcome> result = table.scan(new ScanSpec());
+    Iterator<Item> iterator = result.iterator();
+    Serialiser serialiser = new Serialiser();
+    List<Item> items = new LinkedList<Item>();
+    Iterators.addAll(items, iterator);
+    List<T> objects = serialiser.deserialiseList(items, clazz);
+    RawDynamo rD = new RawDynamo(client, serialiser);
+    rD.deleteBatch(objects);
+  }
+
+  public void testTryQuery() throws Exception {
+    datastore.put(new Score("bart", new DateTime().minusHours(1).toDate(), "tetris", "101"));
+    datastore.put(new Score("bart", new DateTime().minusHours(2).toDate(), "tetris", "102"));
+    datastore.put(new Score("bart", new DateTime().minusHours(3).toDate(), "tetris", "103"));
+    datastore.put(new Score("bart", new DateTime().minusHours(4).toDate(), "tetris", "104"));
+    datastore.put(new Score("bart", new DateTime().minusHours(5).toDate(), "tetris", "105"));
+
+    datastore.put(new Score("lisa", new DateTime().minusHours(4).toDate(), "pokemon", "104"));
+    datastore.put(new Score("lisa", new DateTime().minusHours(5).toDate(), "pokemon", "105"));
+
+    List<Score> bartsScores = datastore.query(Score.class, "bart");
+    List<Score> lisasScores = datastore.query(Score.class, "lisa");
+
+    assertEquals(5, bartsScores.size());
+    assertEquals(2, lisasScores.size());
   }
 
   public void testRecoverStuckTransaction() throws Exception {
@@ -52,6 +97,7 @@ public class DatastoreTests extends TestCase {
   }
 
   public void testSetItem() throws Exception {
+    cleanTable(Game.class);
     Game game = new Game("tetris", "puzzle", new DateTime(2004, 01, 01, 01, 01).toDate());
     datastore.put(game);
   }
@@ -83,6 +129,8 @@ public class DatastoreTests extends TestCase {
   }
 
   public void testTransactionalGetItemLock() throws Exception {
+    datastore.put(new Game("Minecraft", "role playing", new DateTime(2011, 01, 01, 01, 01).toDate()));
+
     Transaction txn = datastore.beginTransaction();
     // getting within a transaction will lock the item
     datastore.get(new DatastoreKey<Game>(Game.class, "Minecraft"));
@@ -101,6 +149,7 @@ public class DatastoreTests extends TestCase {
   }
 
   public void testLockIsAppliedIfObjectPulledFromBeforeTransaction() throws Exception {
+    datastore.put(new Game("Minecraft", "role playing", new DateTime(2011, 01, 01, 01, 01).toDate()));
     Game minecraft = datastore.get(new DatastoreKey<Game>(Game.class, "Minecraft"));
     Transaction txn = datastore.beginTransaction();
     datastore.put(minecraft);
@@ -114,8 +163,10 @@ public class DatastoreTests extends TestCase {
   }
 
   public void testLockIsNotAppliedIfObjectWasModifiedAfterTxStartDate() throws Exception {
+    datastore.put(new Game("Minecraft", "role playing", new DateTime(2011, 01, 01, 01, 01).toDate()));
     Game minecraft = datastore.get(new DatastoreKey<Game>(Game.class, "Minecraft"));
 
+    Thread.sleep(500);
     Transaction txn = datastore.beginTransaction();
 
     // put object outside of transaction. Mimic how another tx would do this.
@@ -149,6 +200,13 @@ public class DatastoreTests extends TestCase {
   }
 
   public void testManyLocks() throws Exception {
+    datastore.put(new Game("Tomb Raider", "role playing", new DateTime(2012, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("Pokemon", "role playing", new DateTime(2013, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("Worms", "Strategy", new DateTime(2015, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("tetris", "Strategy", new DateTime(2015, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("Minecraft", "Strategy", new DateTime(2015, 01, 01, 01, 01).toDate()));
+    Thread.sleep(500);
+
     Transaction txn = datastore.beginTransaction();
 
     Game tetris = datastore.get(new DatastoreKey<Game>(Game.class, "tetris"));
@@ -183,6 +241,13 @@ public class DatastoreTests extends TestCase {
   }
 
   public void testRollBack() throws Exception {
+    datastore.put(new Game("Tomb Raider", "role playing", new DateTime(2012, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("Pokemon", "role playing", new DateTime(2013, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("Worms", "Strategy", new DateTime(2015, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("tetris", "Strategy", new DateTime(2015, 01, 01, 01, 01).toDate()));
+    datastore.put(new Game("Minecraft", "Strategy", new DateTime(2015, 01, 01, 01, 01).toDate()));
+    Thread.sleep(500);
+
     Transaction txn = datastore.beginTransaction();
 
     Game tetris = datastore.get(new DatastoreKey<Game>(Game.class, "tetris"));
@@ -233,7 +298,7 @@ public class DatastoreTests extends TestCase {
 
   public void testMassiveTransaction() throws Exception {
     Transaction txn = datastore.beginTransaction();
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 500; i++) {
       Game game = new Game(RandomStringUtils.randomAlphabetic(10), RandomStringUtils.randomAlphabetic(5), new DateTime(2012, 01, 01, 01, 01).toDate());
       game = datastore.put(game);
 

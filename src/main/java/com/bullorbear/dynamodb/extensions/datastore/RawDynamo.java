@@ -446,7 +446,13 @@ public class RawDynamo {
     }
   }
 
-  <T extends DatastoreObject> void deleteBatch(List<T> objects) {
+  /***
+   * Warning! This isn't safe. It will nuke items in a transaction and leave
+   * things in an inconsistent state. Best to avoid if possible
+   * 
+   * @param objects
+   */
+  public <T extends DatastoreObject> void deleteBatch(List<T> objects) {
     if (objects.size() == 0) {
       return;
     }

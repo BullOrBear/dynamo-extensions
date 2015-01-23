@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.apache.http.util.Asserts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -246,7 +245,7 @@ public class TransactionalExecutor implements Executor {
    * Will create a new task to run this in the background
    */
   private void clean() {
-    Preconditions.checkState(transaction.getState() == TransactionState.FLUSHED || transaction.getState() == TransactionState.ROLLED_BACK,
+    Preconditions.checkState(transaction.getState() == TransactionState.FLUSHED_TASKS || transaction.getState() == TransactionState.ROLLED_BACK,
         "Only transactions in the FLUSHED or ROLLED_BACK state can be cleaned");
     dynamo.deleteBatch(transactionItems);
     dynamo.deleteBatch(tasks);

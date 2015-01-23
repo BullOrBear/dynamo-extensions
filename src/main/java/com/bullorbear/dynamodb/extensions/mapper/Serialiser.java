@@ -60,7 +60,14 @@ public class Serialiser {
     return gson.fromJson(item.toJSON(), clazz);
   }
 
-  @SuppressWarnings("unchecked")
+  public <T> List<T> deserialiseList(List<Item> items, Class<T> clazz) {
+    List<T> objects = new LinkedList<T>();
+    for (Item item : items) {
+      objects.add(this.deserialise(item, clazz));
+    }
+    return objects;
+  }
+
   public <T extends DatastoreObject> T deserialise(Item item, DatastoreKey<T> key) {
     if (item == null) {
       return null;

@@ -19,10 +19,21 @@ public class Score extends DatastoreObject {
   @RangeKey
   private Date datePlayed;
 
-  @IndexRangeKey(localSecondaryIndexName = "game_id-index")
+  @IndexRangeKey(localSecondaryIndexNames = "game_id-index")
   private String gameId;
 
   private String score;
+
+  public Score() {
+  }
+
+  public Score(String userId, Date datePlayed, String gameId, String score) {
+    super();
+    this.userId = userId;
+    this.datePlayed = datePlayed;
+    this.gameId = gameId;
+    this.score = score;
+  }
 
   public String getUserId() {
     return userId;

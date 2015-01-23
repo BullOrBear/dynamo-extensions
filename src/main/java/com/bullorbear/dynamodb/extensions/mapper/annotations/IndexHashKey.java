@@ -15,14 +15,6 @@ import java.lang.annotation.Target;
 public @interface IndexHashKey {
 
   /**
-   * Parameter for the name of the global secondary index.
-   * <p>
-   * This is required if this attribute is the index key for only one global
-   * secondary index.
-   */
-  String globalSecondaryIndexName() default "";
-
-  /**
    * Parameter for the names of the global secondary indexes.
    * <p>
    * This is required if this attribute is the index key for multiple global

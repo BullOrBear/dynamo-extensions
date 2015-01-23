@@ -1,5 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.Date;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -9,6 +10,7 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Transient;
 import com.bullorbear.dynamodb.extensions.utils.AttributeValues;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
+import com.bullorbear.dynamodb.extensions.utils.Iso8601Format;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
@@ -39,21 +41,22 @@ public class DatastoreKey<T extends DatastoreObject> {
 
   public DatastoreKey(Class<T> objectClass, Object hashKeyValue, Object rangeKeyValue) {
     this.setObjectClass(objectClass);
-    this.hashKeyValue = hashKeyValue;
-    this.rangeKeyValue = rangeKeyValue;
+    this.setHashKeyValue(hashKeyValue);
+    this.setRangeKeyValue(rangeKeyValue);
   }
 
   public DatastoreKey(Class<T> objectClass, Object hashKeyValue) {
     this.setObjectClass(objectClass);
-    this.hashKeyValue = hashKeyValue;
+    this.setHashKeyValue(hashKeyValue);
   }
 
   @SuppressWarnings("unchecked")
   public DatastoreKey(T keyObject) {
+    Preconditions.checkNotNull(keyObject, "Cannot create a datastore key from a null object");
     this.setObjectClass((Class<T>) keyObject.getClass());
-    this.hashKeyValue = DynamoAnnotations.getHashKeyValue(keyObject);
+    this.setHashKeyValue(DynamoAnnotations.getHashKeyValue(keyObject));
     if (DynamoAnnotations.hasRangeKey(this.objectClass)) {
-      this.rangeKeyValue = DynamoAnnotations.getRangeKeyValue(keyObject);
+      this.setRangeKeyValue(DynamoAnnotations.getRangeKeyValue(keyObject));
     }
   }
 
@@ -80,7 +83,8 @@ public class DatastoreKey<T extends DatastoreObject> {
   }
 
   public void setHashKeyValue(Object hashKeyValue) {
-    this.hashKeyValue = hashKeyValue;
+
+    this.hashKeyValue = sanitiseValue(hashKeyValue);
   }
 
   public String getRangeKeyColumnName() {
@@ -88,11 +92,11 @@ public class DatastoreKey<T extends DatastoreObject> {
   }
 
   public Object getRangeKeyValue() {
-    return rangeKeyValue;
+    return sanitiseValue(rangeKeyValue);
   }
 
   public void setRangeKeyValue(Object rangeKeyValue) {
-    this.rangeKeyValue = rangeKeyValue;
+    this.rangeKeyValue = sanitiseValue(rangeKeyValue);
   }
 
   public String getTableName() {
@@ -120,6 +124,13 @@ public class DatastoreKey<T extends DatastoreObject> {
       key = ImmutableMap.of(hashKeyColumnName, AttributeValues.toAttributeValue(hashKeyValue));
     }
     return key;
+  }
+
+  private Object sanitiseValue(Object value) {
+    if (value != null && Date.class.isAssignableFrom(value.getClass())) {
+      value = Iso8601Format.format(((Date) value));
+    }
+    return value;
   }
 
   @Override

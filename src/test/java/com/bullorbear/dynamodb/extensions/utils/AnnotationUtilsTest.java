@@ -9,7 +9,7 @@ import com.bullorbear.dynamodb.extensions.test_objects.Score;
 public class AnnotationUtilsTest extends TestCase {
 
   public void testExtractTableName() throws Exception {
-    assertEquals("games", DynamoAnnotations.getTableName(Game.class));
+    assertEquals("game", DynamoAnnotations.getTableName(Game.class));
   }
 
   public void testExtractHashKeyName() throws Exception {
@@ -38,5 +38,16 @@ public class AnnotationUtilsTest extends TestCase {
     DynamoAnnotations.autoGenerateIds(player);
     assertEquals("do-not-overwrite", player.getUserId());
   }
+
+  public void testGetDynamoTableRepresentation() throws Exception {
+    DynamoTable table = DynamoAnnotations.createTableRepresentation(Game.class);
+    System.out.println(table);
+    table = DynamoAnnotations.createTableRepresentation(Player.class);
+    System.out.println(table);
+    table = DynamoAnnotations.createTableRepresentation(Score.class);
+    System.out.println(table);
+  }
+  
+  
 
 }
