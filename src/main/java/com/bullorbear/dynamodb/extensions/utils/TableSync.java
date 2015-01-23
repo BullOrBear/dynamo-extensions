@@ -25,6 +25,7 @@ import com.amazonaws.services.dynamodbv2.model.TableStatus;
 import com.bullorbear.dynamodb.extensions.datastore.Transaction;
 import com.bullorbear.dynamodb.extensions.datastore.TransactionItem;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
+import com.bullorbear.dynamodb.extensions.queue.Task;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
 
@@ -65,6 +66,7 @@ public class TableSync {
     List<Class<?>> annotatedTableClasses = new LinkedList<Class<?>>(annotatedSet);
     annotatedTableClasses.add(Transaction.class);
     annotatedTableClasses.add(TransactionItem.class);
+    annotatedTableClasses.add(Task.class);
 
     // can only create 10 tables at a time
     List<List<Class<?>>> batches = Lists.partition(annotatedTableClasses, 10);
