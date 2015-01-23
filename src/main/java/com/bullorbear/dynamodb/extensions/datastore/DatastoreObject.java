@@ -1,33 +1,32 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
 import java.io.Serializable;
-
-import org.joda.time.DateTime;
+import java.util.Date;
 
 public abstract class DatastoreObject implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private DateTime createdDate;
-  private DateTime modifiedDate;
+  private Date createdDate;
+  private Date modifiedDate;
 
   public boolean isNew() {
     return createdDate == null;
   }
 
-  public DateTime getCreatedDate() {
+  public Date getCreatedDate() {
     return createdDate;
   }
 
-  public DateTime getModifiedDate() {
-    return modifiedDate;
-  }
-
-  void setCreatedDate(DateTime createdDate) {
+  public void setCreatedDate(Date createdDate) {
     this.createdDate = createdDate;
   }
 
-  void setModifiedDate(DateTime modifiedDate) {
+  public Date getModifiedDate() {
+    return modifiedDate;
+  }
+
+  public void setModifiedDate(Date modifiedDate) {
     this.modifiedDate = modifiedDate;
   }
 }

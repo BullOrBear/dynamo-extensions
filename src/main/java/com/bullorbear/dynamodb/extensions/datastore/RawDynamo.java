@@ -15,7 +15,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.log4j.Logger;
-import org.joda.time.DateTime;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
 import com.amazonaws.services.dynamodbv2.document.AttributeUpdate;
@@ -340,8 +339,8 @@ public class RawDynamo {
     String tableName = DynamoAnnotations.getTableName(objectClass);
     Table table = this.dynamo.getTable(tableName);
 
-    DateTime previousModifiedDate = MoreObjects.firstNonNull(object.getModifiedDate(), new DateTime());
-    Expected[] expected = Conditions.chain(Conditions.isNotInATransaction(), Conditions.modifiedDateLessThanOrEqualTo(previousModifiedDate.toDate()));
+    Date previousModifiedDate = MoreObjects.firstNonNull(object.getModifiedDate(), new Date());
+    Expected[] expected = Conditions.chain(Conditions.isNotInATransaction(), Conditions.modifiedDateLessThanOrEqualTo(previousModifiedDate));
     if (object.isNew()) {
       expected = Conditions.chain(Conditions.isNotInATransaction());
     }
@@ -523,9 +522,9 @@ public class RawDynamo {
   }
 
   private DatastoreObject updateAuditDates(DatastoreObject object) {
-    object.setModifiedDate(new DateTime());
+    object.setModifiedDate(new Date());
     if (object.isNew()) {
-      object.setCreatedDate(new DateTime());
+      object.setCreatedDate(new Date());
     }
     return object;
   }

@@ -83,6 +83,6 @@ public class TransactionItem extends DatastoreObject {
     if(this.getCreatedDate() == null){
       return true;
     }
-    return Transaction.hasTransactionWithDateTimedOut(this.getCreatedDate().toDate());
+    return Transaction.hasTransactionWithDateTimedOut(this.getCreatedDate());
   }
 }
