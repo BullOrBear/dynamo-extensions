@@ -125,6 +125,7 @@ public class TransactionalExecutor implements Executor {
     // transaction start date. This ensures that the object hasn't changed from
     // when it was last checked out.
 
+    DynamoAnnotations.autoGenerateIds(object);
     DatastoreKey<T> key = new DatastoreKey<T>(object);
     logger.info("PUTTING OBJECT " + key);
     if (object.isNew() == false && lockedObjectKeys.contains(key) == false) {
@@ -136,7 +137,6 @@ public class TransactionalExecutor implements Executor {
       transaction.incrementLockCount();
     }
 
-    DynamoAnnotations.autoGenerateIds(object);
     sessionObjects.put(key, object);
     transaction.incrementSessionObjectCount();
 
@@ -163,10 +163,11 @@ public class TransactionalExecutor implements Executor {
   // Adds all the items we want to write to the transaction item log
   public void commit() {
     // check we're in a state where we can commit
-    Preconditions.checkState(transaction.getState() == TransactionState.OPEN, "Unable to commit as the transaction (" + transaction.getTransactionId() + ") is not open: "
-        + transaction.getState());
-    Preconditions.checkState(transaction.hasTimedOut() == false, "Unable to commit as the transaction has timed out. Transactions need to complete in less than "
-        + Transaction.TRANSACTION_TIMEOUT_MILLISECONDS + " milliseconds.");
+    Preconditions.checkState(transaction.getState() == TransactionState.OPEN, "Unable to commit as the transaction (" + transaction.getTransactionId()
+        + ") is not open: " + transaction.getState());
+    Preconditions.checkState(transaction.hasTimedOut() == false,
+        "Unable to commit as the transaction has timed out. Transactions need to complete in less than " + Transaction.TRANSACTION_TIMEOUT_MILLISECONDS
+            + " milliseconds.");
 
     // write all the objects we need to update to the transaction log
     for (Entry<DatastoreKey<?>, DatastoreObject> entry : sessionObjects.entrySet()) {
