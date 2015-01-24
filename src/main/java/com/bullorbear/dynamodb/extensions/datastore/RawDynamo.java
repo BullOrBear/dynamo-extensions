@@ -178,7 +178,7 @@ public class RawDynamo {
       spec.withPrimaryKey(key.toPrimaryKey());
       updateResult = table.updateItem(spec);
     } catch (ConditionalCheckFailedException e) {
-      logger.warn("Conditional check failed during get and lock for key " + key);
+      logger.warn("Conditional check failed during get and lock (object may not exist) for key " + key);
       if (attempt == 0) {
         // either the object didn't exist, didn't pass modified date test OR the
         // object is already locked.
