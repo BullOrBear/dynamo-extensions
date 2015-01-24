@@ -126,7 +126,7 @@ public class TransactionalExecutor implements Executor {
     // when it was last checked out.
 
     DatastoreKey<T> key = new DatastoreKey<T>(object);
-    logger.info("PUTTING OBJECT ", key);
+    logger.info("PUTTING OBJECT " + key);
     if (object.isNew() == false && lockedObjectKeys.contains(key) == false) {
       logger.info("PUTTING OLD OBJECT ", key);
       // Object exists in dynamo and has not yet been locked to this transaction
