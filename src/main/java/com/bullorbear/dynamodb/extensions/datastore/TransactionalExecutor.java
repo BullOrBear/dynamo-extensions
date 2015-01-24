@@ -127,9 +127,7 @@ public class TransactionalExecutor implements Executor {
 
     DynamoAnnotations.autoGenerateIds(object);
     DatastoreKey<T> key = new DatastoreKey<T>(object);
-    logger.info("PUTTING OBJECT " + key);
     if (object.isNew() == false && lockedObjectKeys.contains(key) == false) {
-      logger.info("PUTTING OLD OBJECT ", key);
       // Object exists in dynamo and has not yet been locked to this transaction
       dynamo.getAndLock(key, transaction, this.transaction.getStartDate());
       lockedObjects.add(object);
