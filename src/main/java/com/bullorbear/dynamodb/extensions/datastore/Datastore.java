@@ -39,6 +39,8 @@ public class Datastore {
   }
 
   public <T extends DatastoreObject> T put(T object) {
+    String txId = transaction == null? "NO-TX" : transaction.getTransactionId();
+    System.out.println("Putting object into transaction: " + txId + " " + object);
     if (object != null && Task.class.isAssignableFrom(object.getClass())) {
       // Intercept tasks here
       ((TransactionalExecutor) executor).queueTask((Task) object);
