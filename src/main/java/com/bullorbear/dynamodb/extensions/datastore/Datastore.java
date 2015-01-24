@@ -39,6 +39,8 @@ public class Datastore {
   }
 
   public <T extends DatastoreObject> T put(T object) {
+    System.out.println("Putting object: " + object);
+
     if (object != null && Task.class.isAssignableFrom(object.getClass())) {
       // Intercept tasks here
       ((TransactionalExecutor) executor).queueTask((Task) object);
@@ -88,6 +90,8 @@ public class Datastore {
         }
       });
     }
+    
+    System.out.println("Started Transaction " + this.transaction.getTransactionId());
     return this.transaction;
   }
 
