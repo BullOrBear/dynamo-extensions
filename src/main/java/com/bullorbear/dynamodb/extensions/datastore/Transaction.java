@@ -35,9 +35,9 @@ public class Transaction extends DatastoreObject {
   private List<TransactionHook> hooks;
 
   @Transient
-  private int locks;
+  private int locks = 0;
   @Transient
-  private int sessionObjects;
+  private int sessionObjects = 0;
 
   public Transaction() {
     this.hooks = new LinkedList<TransactionHook>();
@@ -155,11 +155,11 @@ public class Transaction extends DatastoreObject {
   }
 
   void incrementLockCount() {
-    locks++;
+    locks = locks + 1;
   }
 
   void incrementSessionObjectCount() {
-    sessionObjects++;
+    sessionObjects = sessionObjects + 1;
   }
 
   public String outputStats(Date transactionCleanDate) {
