@@ -11,8 +11,6 @@ import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 
 public class DefaultExecutor implements Executor {
 
-  private Logger logger = Logger.getLogger(DefaultExecutor.class);
-  
   private RawDynamo dynamo;
   private DatastoreCache cache;
 
@@ -24,10 +22,7 @@ public class DefaultExecutor implements Executor {
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     T obj = cache.get(key);
     if (obj == null) {
-      logger.info("Cache miss for " + key);
       obj = dynamo.get(key);
-    } else {
-      logger.info("Cache hit for " + key);
     }
     return obj;
   }
