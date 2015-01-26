@@ -18,13 +18,13 @@ public class TableSyncTest extends TestCase {
     client.setRegion(Regions.EU_CENTRAL_1);
     sync = new TableSync(client);
   }
-//
-//  public void testDeleteAll() throws Exception {
-//    sync.deleteAllTables();
-//  }
 
-  public void testScan() throws Exception { 
-    sync.scanPackage("com.bullorbear.dynamodb.extensions.test_objects");
+  public void testDeleteAll() throws Exception {
+    sync.deleteAllTables();
   }
+
+//  public void testScan() throws Exception { 
+//    sync.scanPackage("com.bullorbear.dynamodb.extensions.test_objects");
+//  }
 
 }

@@ -3,12 +3,16 @@ package com.bullorbear.dynamodb.extensions.datastore;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.log4j.Logger;
+
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
 
 public class DefaultExecutor implements Executor {
 
+  private Logger logger = Logger.getLogger(DefaultExecutor.class);
+  
   private RawDynamo dynamo;
   private DatastoreCache cache;
 
@@ -20,7 +24,10 @@ public class DefaultExecutor implements Executor {
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     T obj = cache.get(key);
     if (obj == null) {
+      logger.info("Cache miss for " + key);
       obj = dynamo.get(key);
+    } else {
+      logger.info("Cache hit for " + key);
     }
     return obj;
   }
