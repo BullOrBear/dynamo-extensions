@@ -3,8 +3,6 @@ package com.bullorbear.dynamodb.extensions.datastore;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.bullorbear.dynamodb.extensions.datastore.cache.DatastoreCache;
 import com.bullorbear.dynamodb.extensions.utils.DynamoAnnotations;
