@@ -154,7 +154,10 @@ public class RawDynamo {
       throw new DynamoWriteException(
           "Unable obtain lock on item, retry limit reached. Possible it's a deadlock, long running transaction or the item may not exist. Key: " + key);
     }
-    sleepExponentially(attempt);
+    long sleptMills = sleepExponentially(attempt);
+    if (attempt > 0) {
+      logger.warn("Item " + key + " locked by tx " + transaction.getTransactionId() + ". Slept for " + sleptMills + " mills waiting for it to clear");
+    }
     Table table = dynamo.getTable(key.getTableName());
     UpdateItemSpec spec = new UpdateItemSpec();
 
@@ -191,8 +194,9 @@ public class RawDynamo {
           // There wasn't an item
           return null;
         }
+
         Date modifiedDate = Iso8601Format.parse(item.getString("modified_date"));
-        if (modifiedDate.after(modifiedDateLimit)) {
+        if (modifiedDate.after(transaction.getStartDate())) {
           throw new UnableToObtainLockException("The item has been altered since this transaction started. " + key);
         }
         // its already locked with a transaction
@@ -508,17 +512,18 @@ public class RawDynamo {
     }
   }
 
-  private void sleepExponentially(int iteration) {
+  private long sleepExponentially(int iteration) {
     if (iteration == 0) {
-      return;
+      return 0;
     }
     try {
-      long mills = RandomUtils.nextLong(100, 250) * (iteration ^ 2);
-      System.out.println("backing off for " + mills + " mills");
+      long mills = (long) (RandomUtils.nextLong(100, 250) * Math.pow(iteration, 2));
       TimeUnit.MILLISECONDS.sleep(mills);
+      return mills;
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
+    return -1;
   }
 
   private DatastoreObject updateAuditDates(DatastoreObject object) {

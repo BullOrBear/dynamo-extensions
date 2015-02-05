@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import junit.framework.TestCase;
 
@@ -29,6 +30,7 @@ import com.bullorbear.dynamodb.extensions.datastore.TransactionItem;
 import com.bullorbear.dynamodb.extensions.datastore.TransactionRecoverer;
 import com.bullorbear.dynamodb.extensions.datastore.cache.InMemoryCache;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
+import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoWriteException;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.UnableToObtainLockException;
 import com.bullorbear.dynamodb.extensions.test_objects.Game;
 import com.bullorbear.dynamodb.extensions.test_objects.Player;
@@ -44,9 +46,9 @@ public class DatastoreTests extends TestCase {
 
   @Override
   protected void setUp() throws Exception {
-    BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAJJUWPEMYXKMG7YOQ", "MtE5953bOEe8pqhfZl8V5x00New6Qt67gS9CluUB");
+    BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAJRJXFOISPDGSPFGQ", "4dXOhqsXuDhFz66CU9qDkzlOTMN0MITL5rgiM144");
     client = new AmazonDynamoDBAsyncClient(credentials);
-    client.setRegion(Regions.EU_CENTRAL_1);
+    client.setRegion(Regions.US_EAST_1);
     DatastoreFactory.setAsyncClient(client);
     DatastoreFactory.setSerialiser(new Serialiser());
     DatastoreFactory.setCache(new InMemoryCache());
@@ -71,6 +73,44 @@ public class DatastoreTests extends TestCase {
     List<T> objects = serialiser.deserialiseList(items, clazz);
     RawDynamo rD = new RawDynamo(client, serialiser);
     rD.deleteBatch(objects);
+  }
+
+  public void testWaitForLock() throws Exception {
+    cleanTable(Game.class);
+    Game tetris = new Game("tetris", "puzzle", new DateTime(2004, 01, 01, 01, 01).toDate());
+    datastore.put(tetris);
+
+    final Transaction txn = datastore.beginTransaction();
+    // lock tetris
+    datastore.get(DatastoreKey.key(Game.class, "tetris"));
+
+    // Test lock is in place
+    DynamoDB dynamo = new DynamoDB(client);
+    Table table = dynamo.getTable(DynamoAnnotations.getTableName(Game.class));
+    Item item = table.getItem("name", "tetris");
+    // Check the lock is in place
+    assertEquals(txn.getTransactionId(), item.getString(Transaction.TRANSACTION_ID_COLUMN_ID));
+
+    final CountDownLatch latch = new CountDownLatch(1);
+
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        Datastore secondDataStore = new Datastore(client, new Serialiser(), new InMemoryCache());
+
+        Transaction txn2 = secondDataStore.beginTransaction();
+        assertNotSame(txn2.getTransactionId(), txn.getTransactionId());
+        try {
+          if (secondDataStore.get(DatastoreKey.key(Game.class, "tetris")) != null) {
+            fail();
+          }
+        } catch (DynamoWriteException e) {
+          latch.countDown();
+        }
+      }
+    }).run();
+
+    latch.await();
   }
 
   public void testTryQuery() throws Exception {

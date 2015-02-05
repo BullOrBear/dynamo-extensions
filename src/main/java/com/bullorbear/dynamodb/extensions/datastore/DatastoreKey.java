@@ -190,8 +190,10 @@ public class DatastoreKey<T extends DatastoreObject> {
 
   @Override
   public String toString() {
-    return "DatastoreKey [objectClass=" + objectClass + ", tableName=" + tableName + ", hashKeyColumnName=" + hashKeyColumnName + ", hashKeyValue="
-        + hashKeyValue + ", rangeKeyColumnName=" + rangeKeyColumnName + ", rangeKeyValue=" + rangeKeyValue + "]";
+    if (this.hasRangeKey()) {
+      return objectClass.getSimpleName() + "(" + hashKeyValue + ", " + rangeKeyValue + ")";
+    }
+    return objectClass.getSimpleName() + "(" + hashKeyValue + ")";
   }
 
 }

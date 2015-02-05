@@ -22,7 +22,13 @@ public class Datastore {
   Datastore() {
   }
 
-  Datastore(AmazonDynamoDBAsyncClient asyncClient, Serialiser serialiser, DatastoreCache cache) {
+  /**
+   * NB you shouldn't use this constructor. Favour the DatastoreFactory.create() ethod instead
+   * @param asyncClient
+   * @param serialiser
+   * @param cache
+   */
+  public Datastore(AmazonDynamoDBAsyncClient asyncClient, Serialiser serialiser, DatastoreCache cache) {
     this.asyncClient = asyncClient;
     this.cache = cache;
     this.serialiser = serialiser;
