@@ -180,6 +180,7 @@ public class RawDynamo {
       spec.withReturnValues(ReturnValue.ALL_NEW);
       spec.withPrimaryKey(key.toPrimaryKey());
       updateResult = table.updateItem(spec);
+      return updateResult.getItem();
     } catch (ConditionalCheckFailedException e) {
       logger.warn("Conditional check failed during get and lock (object may not exist) for key " + key);
       if (attempt == 0) {
@@ -208,10 +209,8 @@ public class RawDynamo {
       // Should we check the lock here? See if it can be removed?
       // How do we avoid deadlock?
       attempt++;
-      this.getAndLock(key, transaction, modifiedDateLimit, attempt);
+      return this.getAndLock(key, transaction, modifiedDateLimit, attempt);
     }
-
-    return updateResult.getItem();
   }
 
   /***
