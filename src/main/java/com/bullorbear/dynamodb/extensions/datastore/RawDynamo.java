@@ -196,9 +196,11 @@ public class RawDynamo {
           return null;
         }
 
-        Date modifiedDate = Iso8601Format.parse(item.getString("modified_date"));
-        if (modifiedDate.after(transaction.getStartDate())) {
-          throw new UnableToObtainLockException("The item has been altered since this transaction started. " + key);
+        if (modifiedDateLimit != null) {
+          Date modifiedDate = Iso8601Format.parse(item.getString("modified_date"));
+          if (modifiedDate.after(modifiedDateLimit)) {
+            throw new UnableToObtainLockException("The item has been altered since this transaction started. " + key);
+          }
         }
         // its already locked with a transaction
         // check if we can unlock.
