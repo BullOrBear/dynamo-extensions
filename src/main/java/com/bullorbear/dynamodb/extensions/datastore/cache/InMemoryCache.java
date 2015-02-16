@@ -8,16 +8,20 @@ import java.util.Objects;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import com.amazonaws.services.dynamodbv2.document.Item;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreKey;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
+import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 
 /***
- * simple in-memory cache used for testing. DO NOT USE IN PRODUCTION
+ * simple in-memory cache used for testing. DO NOT USE IN PRODUCTION. 
  *
  */
 public class InMemoryCache implements DatastoreCache {
 
-  private Map<String, Object> cache = new HashMap<String, Object>();
+  private Map<String, Item> cache = new HashMap<String, Item>();
+
+  private Serialiser serialiser = new Serialiser();
 
   /**
    * key looks like:
@@ -29,10 +33,10 @@ public class InMemoryCache implements DatastoreCache {
     return StringUtils.join("datastore", key.getTableName(), DigestUtils.md5Hex(concatKeys.getBytes()), ":");
   }
 
-  @SuppressWarnings("unchecked")
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {
     String stringKey = generateCacheKey(key);
-    T object = (T) cache.get(stringKey);
+    Item item = cache.get(stringKey);
+    T object = serialiser.deserialise(item, key);
     return object;
   }
 
@@ -44,8 +48,8 @@ public class InMemoryCache implements DatastoreCache {
     Objects.requireNonNull(object, "Cannot store null value in cache.");
 
     String key = generateCacheKey(new DatastoreKey<T>(object));
-    cache.put(key, object);
-
+    cache.put(key, serialiser.serialise(object));
+    
     return object;
   }
 

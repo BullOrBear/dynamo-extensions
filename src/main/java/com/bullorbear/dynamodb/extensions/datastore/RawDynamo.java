@@ -14,6 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
@@ -533,6 +534,29 @@ public class RawDynamo {
       object.setCreatedDate(new Date());
     }
     return object;
+  }
+
+  public <T extends DatastoreObject> void batchUnlock(List<DatastoreKey<T>> keys, String transactionId) {
+    if (keys.size() == 0) {
+      return;
+    }
+    Preconditions.checkArgument(StringUtils.isNotEmpty(transactionId), "Transaction ID required");
+
+    if (keys.size() < 5) {
+      // Quicker to do one by one
+      for (DatastoreKey<?> key : keys) {
+        this.unlock(key, transactionId);
+      }
+      return;
+    }
+    // Lots of objects here.
+    logger.info("Batch unlocking more than 5 objects.");
+
+    // Dynamo doesn't allow a batch update so its faster to batch get the old
+    // data and write it back. This assumes that the Objects do not serialise
+    // the transaction lock
+    List<T> oldObjects = this.getBatch(new LinkedList<DatastoreKey<T>>(keys));
+    this.putBatch(oldObjects);
   }
 
 }

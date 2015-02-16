@@ -31,7 +31,6 @@ public class TransactionalExecutor implements Executor {
   private Serialiser serialiser;
   private Transaction transaction;
   private Map<DatastoreKey<?>, DatastoreObject> sessionObjects = new HashMap<DatastoreKey<?>, DatastoreObject>();
-  private List<DatastoreObject> lockedObjects = new LinkedList<DatastoreObject>();
   private Set<DatastoreKey<?>> lockedObjectKeys = new HashSet<DatastoreKey<?>>();
   private List<Task> tasks = new LinkedList<Task>();
 
@@ -86,7 +85,6 @@ public class TransactionalExecutor implements Executor {
       // Then lock and retrieve
       object = dynamo.getAndLock(key, transaction);
       if (object != null) {
-        lockedObjects.add(object);
         lockedObjectKeys.add(new DatastoreKey<DatastoreObject>(object));
         sessionObjects.put(key, object);
         transaction.incrementLockCount();
@@ -130,7 +128,6 @@ public class TransactionalExecutor implements Executor {
     if (object.isNew() == false && lockedObjectKeys.contains(key) == false) {
       // Object exists in dynamo and has not yet been locked to this transaction
       dynamo.getAndLock(key, transaction, this.transaction.getStartDate());
-      lockedObjects.add(object);
       lockedObjectKeys.add(new DatastoreKey<DatastoreObject>(object));
       transaction.incrementLockCount();
     }
@@ -226,12 +223,18 @@ public class TransactionalExecutor implements Executor {
 
   // undoes any locks applied during this transaction and removes all temporary
   // objects
-  public void rollback() {
+  @SuppressWarnings("unchecked")
+  public <T extends DatastoreObject> void rollback() {
     // Check in a state where we can rollback
     Preconditions.checkState(transaction.getState() == TransactionState.OPEN, "Unable to rollback as the transaction (" + transaction.getTransactionId()
         + ") is not open: " + transaction.getState());
     // update the locked objects to remove the locks
-    dynamo.putBatch(lockedObjects);
+
+    List<DatastoreKey<T>> keys = new LinkedList<DatastoreKey<T>>();
+    for (DatastoreKey<?> key : lockedObjectKeys) {
+      keys.add((DatastoreKey<T>) key);
+    }
+    dynamo.batchUnlock(keys, transaction.getTransactionId());
 
     transaction.setState(TransactionState.ROLLED_BACK);
     transaction.setRollBackDate(new Date());
