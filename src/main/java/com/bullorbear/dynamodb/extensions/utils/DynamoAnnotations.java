@@ -236,8 +236,10 @@ public class DynamoAnnotations {
         // Look if this gsi has a range key
         if (gsiNameToRangeKeyFieldMap.containsKey(globalSecondaryIndexName)) {
           Field gsiRangeKeyField = gsiNameToRangeKeyFieldMap.get(globalSecondaryIndexName);
+          table.addAttributeDefinition(toAttributeDefinition(gsiRangeKeyField));
           keySchema.add(new KeySchemaElement(DynamoAnnotations.getFieldName(gsiRangeKeyField), KeyType.RANGE));
         }
+        gsi.withKeySchema(keySchema);
         gsi.withProjection(new Projection().withProjectionType(ProjectionType.ALL));
         gsi.withProvisionedThroughput(new ProvisionedThroughput(defaultReadProvisionedThroughput, defaultWriteProvisionedThroughput));
         table.addGlobalSecondaryIndex(gsi);
