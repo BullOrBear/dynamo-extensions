@@ -159,7 +159,7 @@ public class TableSync {
     if (table.getGlobalIndexes() != null && theirGSIs != null) {
       // The local dynamo doesn't returned the provisioned throughput. Need to
       // remove here
-      HashSet<GlobalSecondaryIndex> ourGSIs = new HashSet<GlobalSecondaryIndex>(table.getGlobalIndexes());
+      List<GlobalSecondaryIndex> ourGSIs = new ArrayList<GlobalSecondaryIndex>(table.getGlobalIndexes());
       for (GlobalSecondaryIndex ourGSI : ourGSIs) {
         ourGSI.setProvisionedThroughput(null);
       }

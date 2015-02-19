@@ -40,14 +40,16 @@ public class AnnotationUtilsTest extends TestCase {
   }
 
   public void testGetDynamoTableRepresentation() throws Exception {
-    DynamoTable table = DynamoAnnotations.createTableRepresentation(Game.class);
+//    DynamoTable table = DynamoAnnotations.createTableRepresentation(Game.class);
+//    System.out.println(table);
+    DynamoTable  table = DynamoAnnotations.createTableRepresentation(Player.class);
     System.out.println(table);
-    table = DynamoAnnotations.createTableRepresentation(Player.class);
+   table = DynamoAnnotations.createTableRepresentation(Score.class);
     System.out.println(table);
-    table = DynamoAnnotations.createTableRepresentation(Score.class);
-    System.out.println(table);
+    
+    
   }
-  
+
   
 
 }

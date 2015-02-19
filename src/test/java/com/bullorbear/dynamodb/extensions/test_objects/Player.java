@@ -6,6 +6,8 @@ import java.util.Set;
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.AutoGenerateId;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexHashKey;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexRangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
 
 @Table("player")
@@ -15,8 +17,10 @@ public class Player extends DatastoreObject {
 
   @HashKey
   @AutoGenerateId
+  @IndexHashKey(globalSecondaryIndexNames = { "second-index" })
   private String userId;
 
+  @IndexRangeKey(globalSecondaryIndexNames = { "second-index" })
   private String name;
 
   private Game favouriteGame;
@@ -64,5 +68,5 @@ public class Player extends DatastoreObject {
   public void setAllGamesPlayed(Set<Game> allGamesPlayed) {
     this.allGamesPlayed = allGamesPlayed;
   }
-
+  
 }

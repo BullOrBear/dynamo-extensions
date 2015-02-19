@@ -5,6 +5,7 @@ import junit.framework.TestCase;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
+import com.bullorbear.dynamodb.extensions.test_objects.WalletAuditResult;
 
 public class TableSyncTest extends TestCase {
 
@@ -13,16 +14,17 @@ public class TableSyncTest extends TestCase {
 
   @Override
   protected void setUp() throws Exception {
-    BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAJJUWPEMYXKMG7YOQ", "MtE5953bOEe8pqhfZl8V5x00New6Qt67gS9CluUB");
+    BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAJRJXFOISPDGSPFGQ", "4dXOhqsXuDhFz66CU9qDkzlOTMN0MITL5rgiM144");
     client = new AmazonDynamoDBAsyncClient(credentials);
     client.setRegion(Regions.EU_CENTRAL_1);
     sync = new TableSync(client);
   }
 
-  public void testDeleteAll() throws Exception {
-    sync.deleteAllTables();
-  }
 
+  public void testVerifyTable() throws Exception {
+    sync.verifyTableExists(DynamoAnnotations.createTableRepresentation(WalletAuditResult.class));
+  }
+  
 //  public void testScan() throws Exception { 
 //    sync.scanPackage("com.bullorbear.dynamodb.extensions.test_objects");
 //  }
