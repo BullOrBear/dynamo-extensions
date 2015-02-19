@@ -27,6 +27,7 @@ import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.ItemCollection;
 import com.amazonaws.services.dynamodbv2.document.QueryOutcome;
+import com.amazonaws.services.dynamodbv2.document.ScanOutcome;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.dynamodbv2.document.TableKeysAndAttributes;
 import com.amazonaws.services.dynamodbv2.document.TableWriteItems;
@@ -80,6 +81,17 @@ public class RawDynamo {
    */
   public void recover(String transactionId) {
     txRecoverer.recover(transactionId);
+  }
+
+  public <T extends DatastoreObject> List<T> getAll(Class<T> type) {
+    Table table = dynamo.getTable(DynamoAnnotations.getTableName(type));
+    ItemCollection<ScanOutcome> result = table.scan();
+    Iterator<Item> iterator = result.iterator();
+    List<T> returnList = new LinkedList<T>();
+    while (iterator.hasNext()) {
+      returnList.add(serialiser.deserialise(iterator.next(), type));
+    }
+    return returnList;
   }
 
   public void delete(DatastoreKey<?> key) {
