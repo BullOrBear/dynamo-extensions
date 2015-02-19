@@ -5,7 +5,6 @@ import junit.framework.TestCase;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
-import com.bullorbear.dynamodb.extensions.test_objects.WalletAuditResult;
 
 public class TableSyncTest extends TestCase {
 
@@ -20,13 +19,8 @@ public class TableSyncTest extends TestCase {
     sync = new TableSync(client);
   }
 
-
-  public void testVerifyTable() throws Exception {
-    sync.verifyTableExists(DynamoAnnotations.createTableRepresentation(WalletAuditResult.class));
-  }
-  
-//  public void testScan() throws Exception { 
-//    sync.scanPackage("com.bullorbear.dynamodb.extensions.test_objects");
-//  }
+  // public void testScan() throws Exception {
+  // sync.scanPackage("com.bullorbear.dynamodb.extensions.test_objects");
+  // }
 
 }
