@@ -1,5 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -21,6 +22,7 @@ public class DefaultExecutor implements Executor {
     T obj = cache.get(key);
     if (obj == null) {
       obj = dynamo.get(key);
+      cache.set(obj, false);
     }
     return obj;
   }
@@ -43,6 +45,11 @@ public class DefaultExecutor implements Executor {
       cache.setBatch(dynamoResults);
     }
     return results;
+  }
+
+  @Override
+  public <T extends DatastoreObject> Iterator<T> getAll(Class<T> type) {
+    return dynamo.getAll(type);
   }
 
   public <T extends DatastoreObject> T put(T object) {

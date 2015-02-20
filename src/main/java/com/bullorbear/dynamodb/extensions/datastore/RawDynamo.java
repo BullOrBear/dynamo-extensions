@@ -38,6 +38,7 @@ import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.KeysAndAttributes;
 import com.amazonaws.services.dynamodbv2.model.ReturnValue;
 import com.amazonaws.services.dynamodbv2.model.WriteRequest;
+import com.bullorbear.dynamodb.extensions.mapper.DeserialisingIterator;
 import com.bullorbear.dynamodb.extensions.mapper.Serialiser;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoReadException;
 import com.bullorbear.dynamodb.extensions.mapper.exceptions.DynamoWriteException;
@@ -83,15 +84,11 @@ public class RawDynamo {
     txRecoverer.recover(transactionId);
   }
 
-  public <T extends DatastoreObject> List<T> getAll(Class<T> type) {
+  public <T extends DatastoreObject> Iterator<T> getAll(Class<T> type) {
     Table table = dynamo.getTable(DynamoAnnotations.getTableName(type));
     ItemCollection<ScanOutcome> result = table.scan();
-    Iterator<Item> iterator = result.iterator();
-    List<T> returnList = new LinkedList<T>();
-    while (iterator.hasNext()) {
-      returnList.add(serialiser.deserialise(iterator.next(), type));
-    }
-    return returnList;
+    Iterator<Item> itemIterator = result.iterator();
+    return new DeserialisingIterator<T>(serialiser, itemIterator, type);
   }
 
   public void delete(DatastoreKey<?> key) {

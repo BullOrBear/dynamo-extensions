@@ -1,5 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.Iterator;
 import java.util.List;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClient;
@@ -23,7 +24,9 @@ public class Datastore {
   }
 
   /**
-   * NB you shouldn't use this constructor. Favour the DatastoreFactory.create() ethod instead
+   * NB you shouldn't use this constructor. Favour the DatastoreFactory.create()
+   * ethod instead
+   * 
    * @param asyncClient
    * @param serialiser
    * @param cache
@@ -42,6 +45,10 @@ public class Datastore {
 
   public <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys) {
     return executor.get(keys);
+  }
+
+  public <T extends DatastoreObject> Iterator<T> getAll(Class<T> type) {
+    return executor.getAll(type);
   }
 
   public <T extends DatastoreObject> T put(T object) {

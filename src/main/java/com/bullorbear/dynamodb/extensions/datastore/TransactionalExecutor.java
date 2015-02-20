@@ -3,6 +3,7 @@ package com.bullorbear.dynamodb.extensions.datastore;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +107,11 @@ public class TransactionalExecutor implements Executor {
       results.add(this.get(key));
     }
     return results;
+  }
+
+  @Override
+  public <T extends DatastoreObject> Iterator<T> getAll(Class<T> type) {
+    throw new IllegalStateException("The getAll opperation is not supported whilst in a transactions as this will lock up the table");
   }
 
   public <T extends DatastoreObject> T put(T object) {

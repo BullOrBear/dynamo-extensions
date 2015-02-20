@@ -1,5 +1,6 @@
 package com.bullorbear.dynamodb.extensions.datastore;
 
+import java.util.Iterator;
 import java.util.List;
 
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
@@ -19,6 +20,8 @@ public interface Executor {
   <T extends DatastoreObject> T get(DatastoreKey<T> key);
 
   <T extends DatastoreObject> List<T> get(List<DatastoreKey<T>> keys);
+
+  <T extends DatastoreObject> Iterator<T> getAll(Class<T> type);
 
   <T extends DatastoreObject> T put(T object);
 
