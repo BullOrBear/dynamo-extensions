@@ -22,7 +22,9 @@ public class DefaultExecutor implements Executor {
     T obj = cache.get(key);
     if (obj == null) {
       obj = dynamo.get(key);
-      cache.set(obj, false);
+      if (obj != null) {
+        cache.set(obj, false);
+      }
     }
     return obj;
   }
