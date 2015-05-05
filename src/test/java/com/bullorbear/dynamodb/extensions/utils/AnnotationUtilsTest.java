@@ -16,9 +16,21 @@ public class AnnotationUtilsTest extends TestCase {
     assertEquals("name", DynamoAnnotations.getHashKeyFieldName(Game.class));
     assertEquals("user_id", DynamoAnnotations.getHashKeyFieldName(Score.class));
   }
+  
+  public void testExtractIndexHashKeyName() throws Exception {
+    assertEquals("game_id", DynamoAnnotations.getIndexHashKeyFieldName(Score.class, "game_score-index"));
+  }
 
   public void testExtractRangeKeyName() throws Exception {
     assertEquals("date_played", DynamoAnnotations.getRangeKeyFieldName(Score.class));
+  }
+  
+  public void testExtractIndexGlobalRangeKeyName() throws Exception {
+    assertEquals("score", DynamoAnnotations.getGlobalIndexRangeKeyFieldName(Score.class, "game_score-index"));
+  }
+  
+  public void testExtractIndexLocalRangeKeyName() throws Exception {
+    assertEquals("game_id", DynamoAnnotations.getLocalIndexRangeKeyFieldName(Score.class, "game_id-index"));
   }
 
   public void testHasRangeKeyCheck() throws Exception {

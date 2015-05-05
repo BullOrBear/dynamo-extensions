@@ -4,6 +4,7 @@ import java.util.Date;
 
 import com.bullorbear.dynamodb.extensions.datastore.DatastoreObject;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.HashKey;
+import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexHashKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.IndexRangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.RangeKey;
 import com.bullorbear.dynamodb.extensions.mapper.annotations.Table;
@@ -20,8 +21,10 @@ public class Score extends DatastoreObject {
   private Date datePlayed;
 
   @IndexRangeKey(localSecondaryIndexNames = "game_id-index")
+  @IndexHashKey(globalSecondaryIndexNames = "game_score-index")
   private String gameId;
 
+  @IndexRangeKey(globalSecondaryIndexNames = "game_score-index")
   private String score;
 
   public Score() {

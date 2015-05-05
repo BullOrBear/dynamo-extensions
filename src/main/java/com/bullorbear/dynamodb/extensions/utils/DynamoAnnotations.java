@@ -100,6 +100,26 @@ public class DynamoAnnotations {
     Field hashKeyField = DynamoAnnotations.getOnlyFieldAnnotatedWithAnnotation(clazz, HashKey.class);
     return DynamoAnnotations.getFieldName(hashKeyField);
   }
+  
+  /***
+   * Returns the HashKey field name as it would be translated for Dynamo (i.e.
+   * with underscores instead of camel case) for the given index name
+   * 
+   * @param clazz
+   * @param globalSecondaryIndexName
+   * @return
+   */
+  public static String getIndexHashKeyFieldName(Class<?> clazz, String globalSecondaryIndexName) {
+    List<Field> hashKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, IndexHashKey.class);
+    for (Field field : hashKeyFields) {
+    	for (String indexName : field.getAnnotation(IndexHashKey.class).globalSecondaryIndexNames()) {
+    		if (globalSecondaryIndexName.equals(indexName)) {
+    			return DynamoAnnotations.getFieldName(field);
+    		}
+    	}
+    }
+    throw new IllegalStateException("Class " + clazz.getName() + " does not contain global secondary index " + globalSecondaryIndexName);
+  }
 
   /***
    * Returns the range key field name as it would be translated for Dynamo (i.e.
@@ -111,6 +131,46 @@ public class DynamoAnnotations {
   public static String getRangeKeyFieldName(Class<?> clazz) {
     Field rangeKeyField = DynamoAnnotations.getOnlyFieldAnnotatedWithAnnotation(clazz, RangeKey.class);
     return DynamoAnnotations.getFieldName(rangeKeyField);
+  }
+  
+  /***
+   * Returns the RangeKey field name as it would be translated for Dynamo (i.e.
+   * with underscores instead of camel case) for the given global index name
+   * 
+   * @param clazz
+   * @param globalSecondaryIndexName
+   * @return
+   */
+  public static String getGlobalIndexRangeKeyFieldName(Class<?> clazz, String globalSecondaryIndexName) {
+    List<Field> hashKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, IndexRangeKey.class);
+    for (Field field : hashKeyFields) {
+    	for (String indexName : field.getAnnotation(IndexRangeKey.class).globalSecondaryIndexNames()) {
+    		if (globalSecondaryIndexName.equals(indexName)) {
+    			return DynamoAnnotations.getFieldName(field);
+    		}
+    	}
+    }
+    throw new IllegalStateException("Class " + clazz.getName() + " either does not contain global secondary index " + globalSecondaryIndexName + " or the index doesn't have a range key");
+  }
+  
+  /***
+   * Returns the RangeKey field name as it would be translated for Dynamo (i.e.
+   * with underscores instead of camel case) for the given local index name
+   * 
+   * @param clazz
+   * @param globalSecondaryIndexName
+   * @return
+   */
+  public static String getLocalIndexRangeKeyFieldName(Class<?> clazz, String localSecondaryIndexName) {
+    List<Field> hashKeyFields = DynamoAnnotations.getAllFieldsAnnotatedWithAnnotation(clazz, IndexRangeKey.class);
+    for (Field field : hashKeyFields) {
+    	for (String indexName : field.getAnnotation(IndexRangeKey.class).localSecondaryIndexNames()) {
+    		if (localSecondaryIndexName.equals(indexName)) {
+    			return DynamoAnnotations.getFieldName(field);
+    		}
+    	}
+    }
+    throw new IllegalStateException("Class " + clazz.getName() + " either does not contain local secondary index " + localSecondaryIndexName);
   }
 
   public static Field getOnlyFieldAnnotatedWithAnnotation(Class<?> clazz, Class<? extends Annotation> annotation) {
