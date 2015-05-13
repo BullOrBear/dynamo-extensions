@@ -68,26 +68,76 @@ public class Datastore {
     executor.delete(key);
   }
 
+  /***
+   * Returns all the objects of class {@code type} that have the {@code hashkey}
+   * provided. Best not to use with large datasets
+   * 
+   * @param type
+   * @param hashKey
+   * @return
+   */
   public <T extends DatastoreObject> List<T> query(Class<T> type, Object hashKey) {
     return executor.query(type, hashKey);
   }
 
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec.
+   * Best not to use with large datasets.
+   * 
+   * @param type
+   * @param spec
+   * @return
+   */
   public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, QuerySpec spec) {
     return executor.queryWithSpec(type, spec);
   }
 
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec
+   * using a specific index. Best not to use with large datasets.
+   * 
+   * @param type
+   * @param indexName
+   * @param spec
+   * @return
+   */
   public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec) {
     return executor.queryWithSpec(type, indexName, spec);
   }
   
+  /***
+   * Returns all the objects of class {@code type} that have the {@code hashkey}
+   * provided as an iterator. Better for large datasets.
+   * 
+   * @param type
+   * @param hashKey
+   * @return
+   */
   public <T extends DatastoreObject> Iterator<T> queryIterator(Class<T> type, Object hashKey) {
     return executor.queryIterator(type, hashKey);
   }
 
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec as an iterator.
+   * Better for large datasets.
+   * 
+   * @param type
+   * @param spec
+   * @return
+   */
   public <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, QuerySpec spec) {
     return executor.queryIteratorWithSpec(type, spec);
   }
 
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec as an iterator
+   * using a specific index. Better for large datasets.
+   * 
+   * @param type
+   * @param indexName
+   * @param spec
+   * @return
+   */
   public <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, String indexName, QuerySpec spec) {
     return executor.queryIteratorWithSpec(type, indexName, spec);
   }
