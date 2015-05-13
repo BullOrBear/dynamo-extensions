@@ -79,6 +79,18 @@ public class Datastore {
   public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec) {
     return executor.queryWithSpec(type, indexName, spec);
   }
+  
+  public <T extends DatastoreObject> Iterator<T> queryIterator(Class<T> type, Object hashKey) {
+    return executor.queryIterator(type, hashKey);
+  }
+
+  public <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, QuerySpec spec) {
+    return executor.queryIteratorWithSpec(type, spec);
+  }
+
+  public <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, String indexName, QuerySpec spec) {
+    return executor.queryIteratorWithSpec(type, indexName, spec);
+  }
 
   /***
    * Begins a new transaction or returns an existing one if there is one present

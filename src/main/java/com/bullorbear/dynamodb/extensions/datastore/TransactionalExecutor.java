@@ -77,6 +77,22 @@ public class TransactionalExecutor implements Executor {
   public <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec) {
     return dynamo.query(type, indexName, spec);
   }
+  
+	@Override
+	public <T extends DatastoreObject> Iterator<T> queryIterator(Class<T> type, Object hashKey) {
+    QuerySpec spec = new QuerySpec().withHashKey(DynamoAnnotations.getHashKeyFieldName(type), hashKey);
+		return dynamo.queryIterator(type, spec);
+	}
+
+	@Override
+	public <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, QuerySpec spec) {
+		return dynamo.queryIterator(type, spec);
+	}
+
+	@Override
+	public <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, String indexName, QuerySpec spec) {
+		return dynamo.queryIterator(type, indexName, spec);
+	}
 
   @SuppressWarnings("unchecked")
   public <T extends DatastoreObject> T get(DatastoreKey<T> key) {

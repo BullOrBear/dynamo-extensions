@@ -32,6 +32,7 @@ import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.dynamodbv2.document.TableKeysAndAttributes;
 import com.amazonaws.services.dynamodbv2.document.TableWriteItems;
 import com.amazonaws.services.dynamodbv2.document.UpdateItemOutcome;
+import com.amazonaws.services.dynamodbv2.document.api.QueryApi;
 import com.amazonaws.services.dynamodbv2.document.spec.QuerySpec;
 import com.amazonaws.services.dynamodbv2.document.spec.UpdateItemSpec;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
@@ -106,20 +107,35 @@ public class RawDynamo {
    */
   public <T extends DatastoreObject> List<T> query(Class<T> type, QuerySpec spec) {
     Table table = dynamo.getTable(DynamoAnnotations.getTableName(type));
-    ItemCollection<QueryOutcome> result = table.query(spec);
-    Iterator<Item> iterator = result.iterator();
-    List<T> returnList = new LinkedList<T>();
-    while (iterator.hasNext()) {
-      returnList.add(serialiser.deserialise(iterator.next(), type));
-    }
-    return returnList;
+    Iterator<Item> iterator = this.query(table, spec);
+    return deserialiseToList(iterator, type);
+  }
+  
+  public <T extends DatastoreObject> List<T> query(Class<T> type, String indexName, QuerySpec spec) {
+  	Index index = dynamo.getTable(DynamoAnnotations.getTableName(type)).getIndex(indexName);
+  	Iterator<Item> iterator = this.query(index, spec);
+  	return deserialiseToList(iterator, type);
   }
 
-  public <T extends DatastoreObject> List<T> query(Class<T> type, String indexName, QuerySpec spec) {
-    Index index = dynamo.getTable(DynamoAnnotations.getTableName(type)).getIndex(indexName);
-    ItemCollection<QueryOutcome> result = index.query(spec);
-    Iterator<Item> iterator = result.iterator();
-    List<T> returnList = new LinkedList<T>();
+  public <T extends DatastoreObject> Iterator<T> queryIterator(Class<T> type, QuerySpec spec) {
+  	Table table = dynamo.getTable(DynamoAnnotations.getTableName(type));
+    Iterator<Item> itemIterator = this.query(table, spec);
+    return new DeserialisingIterator<T>(serialiser, itemIterator, type);
+  }
+  
+  public <T extends DatastoreObject> Iterator<T> queryIterator(Class<T> type, String indexName, QuerySpec spec) {
+  	Index index = dynamo.getTable(DynamoAnnotations.getTableName(type)).getIndex(indexName);
+    Iterator<Item> itemIterator = this.query(index, spec);
+    return new DeserialisingIterator<T>(serialiser, itemIterator, type);
+  }
+  
+  private Iterator<Item> query(QueryApi document, QuerySpec spec) {
+  	ItemCollection<QueryOutcome> result = document.query(spec);
+    return result.iterator();
+  }
+  
+  private <T extends DatastoreObject> List<T> deserialiseToList(Iterator<Item> iterator, Class<T> type) {
+  	List<T> returnList = new LinkedList<T>();
     while (iterator.hasNext()) {
       returnList.add(serialiser.deserialise(iterator.next(), type));
     }

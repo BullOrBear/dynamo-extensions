@@ -59,5 +59,36 @@ public interface Executor {
    * @return
    */
   <T extends DatastoreObject> List<T> queryWithSpec(Class<T> type, String indexName, QuerySpec spec);
+  
+  /***
+   * Returns all the objects of class {@code type} that have the {@code hashkey}
+   * provided as an iterator. Better for large datasets.
+   * 
+   * @param type
+   * @param hashKey
+   * @return
+   */
+  <T extends DatastoreObject> Iterator<T> queryIterator(Class<T> type, Object hashKey);
+  
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec as an iterator.
+   * Better for large datasets.
+   * 
+   * @param type
+   * @param spec
+   * @return
+   */
+  <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, QuerySpec spec);
+
+  /***
+   * Returns all the objects of class {@code type} matched by the query spec as an iterator
+   * using a specific index. Better for large datasets.
+   * 
+   * @param type
+   * @param indexName
+   * @param spec
+   * @return
+   */
+  <T extends DatastoreObject> Iterator<T> queryIteratorWithSpec(Class<T> type, String indexName, QuerySpec spec);
 
 }
