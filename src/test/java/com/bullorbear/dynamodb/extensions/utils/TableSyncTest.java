@@ -13,7 +13,7 @@ public class TableSyncTest extends TestCase {
 
   @Override
   protected void setUp() throws Exception {
-    BasicAWSCredentials credentials = new BasicAWSCredentials("AKIAJRJXFOISPDGSPFGQ", "4dXOhqsXuDhFz66CU9qDkzlOTMN0MITL5rgiM144");
+    BasicAWSCredentials credentials = new BasicAWSCredentials("-", "-");
     client = new AmazonDynamoDBAsyncClient(credentials);
     client.setRegion(Regions.EU_CENTRAL_1);
     sync = new TableSync(client);
